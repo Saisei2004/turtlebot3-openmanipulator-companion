@@ -9,17 +9,15 @@ TurtleBot3（Waffle サイズに作り変えた 2 段の車体）+ OpenManipulat
 
 | 機能 | 内容 |
 |---|---|
-| 走行 | ジョイスティック（倒した量で速さが変わる）、WASD・矢印キー、速度の 3 段（SLOW / NORMAL / FAST） |
-| アーム・グリッパー | 関節ごとのスライダー、手先の直接操作（前後・上下・傾き・旋回）、READY / HOME / REACH / PICK LOW、側面図のタップ移動、姿勢の保存と連続再生 |
+| 走行 | W/A/S/D・矢印キー・ボタン（押している間だけ）、最大速度のスライダー、ゲームパッド（左スティック） |
+| アーム・グリッパー | 関節ごとのスライダーと Execute Pose（動かす前に MuJoCo で衝突を調べる）、現在位置の読み込み、HOME、グリッパーの開閉 |
 | Orbit | 半径 20〜60 cm（既定 30 cm）の円を走り続ける。LiDAR で進路を見て、障害物があれば止まる |
 | Dance | 4 つの関節がずっと動き続ける周期 24 秒の動きと、グリッパーの開閉。始める前に MuJoCo で衝突を調べ、当たらない大きさに縮める |
 | MuJoCo の衝突判定 | アームを動かす前に、経路を MuJoCo で調べ、当たる動きは断る |
 | 止まる仕組み | PC が 20 Hz で心拍を出し、機体側の見張り（deadman）が 0.3 秒途切れたら腕と車輪を止める |
 | 無線 | 機体は Wi-Fi だけで動く。有線を抜き差ししても ROS 2 の通信が壊れない設定 |
 
-操作画面（PC 幅）:
-
-![操作画面](docs/img/ui-desktop.png)
+操作画面は、検証に要る機能だけの 1 枚の小さなページ（`pc/server/webui/index.html`。走行・Orbit・Dance・アーム・LiDAR・ログ・STOP）。
 
 ## 構成
 
@@ -52,7 +50,7 @@ TurtleBot3（Waffle サイズに作り変えた 2 段の車体）+ OpenManipulat
 | # | やること | コマンド・操作 |
 |---|---|---|
 | 1 | PC にクローンする | `git clone https://github.com/Saisei2004/turtlebot3-openmanipulator-companion.git tb3-companion` |
-| 2 | 機体に入る鍵を置く（**秘密鍵を前の担当者から受け取る**。公開鍵だけでは入れない） | `python3 tb3ctl.py install-key <秘密鍵のファイル>` |
+| 2 | 機体に入る鍵を置く（鍵はリポジトリの `robot/keys/` に入っている） | `python3 tb3ctl.py install-key`（`init` でも自動で置く） |
 | 3 | PC に必要なものを入れて、設定を作る | `bash pc/scripts/setup_pc.sh`（WSL / Ubuntu の中）→ `python3 tb3ctl.py init` |
 | 4 | PC と機体を、イーサネットケーブルでつなぎ、機体の電源を入れる | `python3 tb3ctl.py status` |
 | 5 | 機体に Wi-Fi を設定する | `python3 tb3ctl.py robot-wifi --ssid <SSID> --psk <パスフレーズ> --set-host` |

@@ -45,7 +45,7 @@
 
 | API | 内容 |
 |---|---|
-| `GET /api/library` / `PUT /api/library` | 姿勢と動作列の読み出し・保存。保存先は `TB3_DATA_DIR/poses.json`（既定 `~/.local/share/tb3-companion/`）。初回は `home`（折りたたみ姿勢）だけ |
+| `GET /api/library` / `PUT /api/library` | 姿勢と動作列の読み出し・保存（今の画面は使わない。以前の画面の名残）。保存先は `TB3_DATA_DIR/poses.json`（既定 `~/.local/share/tb3-companion/`）。初回は `home`（折りたたみ姿勢）だけ |
 | `POST /api/check` | `{"poses": [[q1,q2,q3,q4], ...]}`（最大 400 件、`/joint_states` と同じ値）→ 各姿勢の `ok / hit / limit / depth_mm / torque_pct_200g`。MuJoCo で判定 |
 | `GET /api/circle` | Orbit・Dance・グリッパーの状態（`running`、`link_ok`、`dry`、`arm.*`、`gripper.*`、`stop_reason` など） |
 | `POST /api/circle` | `{"action":"start","radius":0.3,"speed":0.1,"dir":"left"}` または `{"action":"stop","what":"all\|orbit\|dance"}` |

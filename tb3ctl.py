@@ -4,7 +4,7 @@
   tb3ctl init                  設定ファイル config/tb3.env を対話で作る（機体の IP・ドメイン ID など）
   tb3ctl robot-install [フェーズ]   機体に全部入れる（まっさらな Ubuntu 22.04 から。1〜2 時間）。フェーズ: base ros ws files opencr
   tb3ctl robot-apply           機体の設定とサービスだけ入れ直して再起動する（数十秒）
-  tb3ctl install-key 秘密鍵    前の担当者から受け取った秘密鍵を ~/.ssh に置き、config に書く（機体に ssh で入れるのは、この鍵だけ）
+  tb3ctl install-key [秘密鍵]  リポジトリの鍵（robot/keys/）を ~/.ssh に置き、config に書く（init が自動でやる）
   tb3ctl robot-wifi --ssid S --psk P [--set-host] [--static IP/24 --gateway GW]
                                機体を別の Wi-Fi につなぐ。有線で ssh できる状態で動かす。PC から届くことを確かめてから確定し、
                                確定できなければ自動で元の Wi-Fi に戻る。そのあと有線を外してよい
@@ -244,7 +244,7 @@ def cmd_robot_wifi(a, cfg):
 def cmd_install_key(a, cfg):
     """機体に入れる秘密鍵を、この PC の ~/.ssh に置いて、config の ROBOT_SSH_KEY に書く。
     リポジトリに入っている公開鍵（robot/keys/）と、組になっているか確かめる"""
-    src = Path(a.private_key).expanduser()
+    src = Path(a.private_key).expanduser() if a.private_key else ROOT / "robot" / "keys" / "id_ed25519_turtlebot"
     if not src.is_file():
         sys.exit(f"{src} がありません")
     head = src.read_text(errors="replace")[:80]
@@ -348,7 +348,7 @@ def cmd_init(a, cfg):
 
     ask("ROBOT_HOST", "機体の IP か名前（例 192.168.0.50, turtlebot.local）", cfg["ROBOT_HOST"] or "192.168.11.100")
     ask("ROBOT_USER", "機体のユーザー名", cfg["ROBOT_USER"])
-    ask("ROBOT_SSH_KEY", "ssh の秘密鍵のパス（無ければ空）", cfg["ROBOT_SSH_KEY"])
+    ask("ROBOT_SSH_KEY", "ssh の秘密鍵のパス（空のままなら、リポジトリの robot/keys/ の鍵を ~/.ssh に置いて使う）", cfg["ROBOT_SSH_KEY"])
     ask("ROS_DOMAIN_ID", "ROS_DOMAIN_ID（機体と PC で同じ。0〜101）", cfg["ROS_DOMAIN_ID"])
     ask("DDS_MODE", "DDS の発見: unicast（Wi-Fi 向け）か multicast", cfg["DDS_MODE"])
     ask("DDS_IFACE", "機体の ROS 2 が使うインタフェース（wlan0 / eth0 / any）", cfg["DDS_IFACE"])
@@ -382,7 +382,7 @@ def main():
     p.add_argument("--dns"); p.add_argument("--open", action="store_true", help="パスワードなしのネットワーク")
     p.add_argument("--set-host", action="store_true", help="確定したら config の ROBOT_HOST を新しい宛先に書き換える")
     p.add_argument("--restore-after", type=int, default=240, help="確定しなければ元に戻すまでの秒数"); p.set_defaults(fn=cmd_robot_wifi)
-    p = sub.add_parser("install-key"); p.add_argument("private_key", help="前の担当者から受け取った秘密鍵のファイル"); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_install_key)
+    p = sub.add_parser("install-key"); p.add_argument("private_key", nargs="?", help="秘密鍵のファイル（省略すると、リポジトリの robot/keys/ の鍵を使う）"); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_install_key)
     p = sub.add_parser("add-key"); p.add_argument("pubkeys", nargs="+", help="足す公開鍵のファイル（.pub）"); p.set_defaults(fn=cmd_add_key)
     p = sub.add_parser("robot-ssh"); p.add_argument("command", nargs=argparse.REMAINDER); p.set_defaults(fn=cmd_robot_ssh)
     p = sub.add_parser("server"); p.add_argument("--dry", action="store_true"); p.add_argument("--open", action="store_true", help="ブラウザで操作画面を開く"); p.set_defaults(fn=cmd_server)

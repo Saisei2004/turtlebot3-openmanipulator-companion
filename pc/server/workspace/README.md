@@ -2,7 +2,7 @@
 
 TB3 に載った OpenManipulator-X を MuJoCo で再現し、姿勢を網羅的に試して「動ける範囲」を求めた。機体には何も送っていない（機体から読んだのは robot_description とメッシュだけ）。
 
-## 座標系・規約（webui/arm_kin.js と同じ）
+## 座標系・規約（sim_common.py の解析 FK と同じ）
 - 原点 = joint2 の軸（base_link で x=-0.080, z=0.1675）。r = 前方、z = 上、pitch = 手先の下向き角 = a2+a3+a4（+は下向き、+90°で真下、-90°で真上）。
 - q = /joint_states の値（指令に使う値）、a = URDF 側の関節角 = q + OFFSET、OFFSET = [0, 0.93, 0.07, -1.65]（カメラで実測済み）。
 - 床は joint2 軸から -17.75 cm、上段の板の上面は -7.55 cm。

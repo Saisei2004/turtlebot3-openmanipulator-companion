@@ -11,7 +11,7 @@ OFFSET = [0, 0.93, 0.07, -1.65]   [rad]（joint1, joint2, joint3, joint4）
 | 項目 | 内容 |
 |---|---|
 | 実測のしかた（2026-10-25） | ウェブカメラ（eMeet C960）で機体を真横から撮り、全関節を 0 にした姿勢と、関節を 1 つずつ少し動かした前後を比べた。全関節 0 のとき、実物は上腕が前に約 66° 倒れ、前腕が前下がり約 60°、手先が前上がり約 35°。URDF では上腕が真上で前腕・手先が水平のはず。関節を動かす向きは URDF と同じ（joint2 と joint4 を少し動かして確かめた）。写真（真横から撮った 1 枚）から別に見積もった値（+0.91、+0.075、-1.63）ともほぼ同じ |
-| 検証 | 指令 `q = [0, -0.93, -0.07, 1.65]`（`a = 0`）を送ると、実物が「上腕が真上、前腕と手先が水平」の L 字になった（カメラで確認）。この姿勢が **READY**。MuJoCo の手先位置は、`arm_kin.js` の式と 500 姿勢で一致（誤差 0.0000 mm） |
+| 検証 | 指令 `q = [0, -0.93, -0.07, 1.65]`（`a = 0`）を送ると、実物が「上腕が真上、前腕と手先が水平」の L 字になった（カメラで確認）。この姿勢が **READY**。MuJoCo の手先位置は、以前の画面の運動学（`arm_kin.js`、削除済み）の式と 500 姿勢で一致（誤差 0.0000 mm） |
 | 関節限界 | URDF の限界は `a` に対するもの。`q` に直すと下の表 |
 
 | 関節 | `a` の限界（URDF）[rad] | `q` の限界 [rad] |
@@ -21,7 +21,7 @@ OFFSET = [0, 0.93, 0.07, -1.65]   [rad]（joint1, joint2, joint3, joint4）
 | joint3 | -0.9425 〜 1.3823 | **-1.0125 〜 1.3123** |
 | joint4 | -1.7907 〜 2.0420 | **-0.1407 〜 3.1416**（サーボの出力軸の範囲 π で頭打ち） |
 
-`pc/server/webui/arm_kin.js` の `LIMITS` は、この `q` の限界。**最初の実装は URDF の限界を `q` にそのまま当てていて間違っていた**（MuJoCo の解析で見つかった。下の 4.）。
+`pc/server/webui/index.html` の `LIMITS`（と `workspace/sim_common.py` の `WEB_LIM`）は、この `q` の限界。**最初の実装は URDF の限界を `q` にそのまま当てていて間違っていた**（MuJoCo の解析で見つかった。下の 4.）。
 
 ## 2. 側面図の座標
 
@@ -33,14 +33,15 @@ OFFSET = [0, 0.93, 0.07, -1.65]   [rad]（joint1, joint2, joint3, joint4）
 | `pitch` | 手先の下向き角 = a2 + a3 + a4（+ は下向き。+90° で真下、-90° で真上） |
 | `yaw` | `joint1` の角度（左右の旋回） |
 
-寸法（`arm_kin.js`、`robot_description` から）: joint2 → joint3 が (0.024, 0.128) m、joint3 → joint4 が 0.124 m、joint4 → 手先（`end_effector_link`）が 0.126 m。
+寸法（`sim_common.py`、`robot_description` から）: joint2 → joint3 が (0.024, 0.128) m、joint3 → joint4 が 0.124 m、joint4 → 手先（`end_effector_link`）が 0.126 m。
 
-## 3. 順運動学・逆運動学（`pc/server/webui/arm_kin.js`）
+## 3. 順運動学・逆運動学（`workspace/sim_common.py` の解析版）
+
+画面は小さくしたので、もう運動学を持たない（手先操作・側面図・READY は外した。以前の `arm_kin.js` と同じ式が `sim_common.py` に残っている）。
 
 - `fk(q)`: `q` から `r, z, pitch, yaw` と、各関節の点。
 - `ik({r, z, pitch, yaw})`: `q` を返す。肘を上にした**解が 1 つだけ**（ほかの解は使わない）。届かない、または `q` の限界の外なら `null`。
 - 往復の誤差は 1e-16 rad 程度（5 姿勢で確認）。
-- 画面は、手先操作・READY・側面図のタップ移動の計算にこれを使う。
 
 ## 4. MuJoCo の解析（`pc/server/workspace/`）
 
@@ -53,12 +54,11 @@ OFFSET = [0, 0.93, 0.07, -1.65]   [rad]（joint1, joint2, joint3, joint4）
 | `robot.urdf` | 機体の `robot_description`（xacro から生成されたもの） |
 | `meshes/`、`meshes/parts/` | 機体のメッシュと、凸分解した部品（`mesh_parts.py` が作る。MuJoCo のメッシュ衝突は凸包になり、細長いリンクだと大きすぎて、実機で取れた姿勢まで「衝突」になるため、長手方向のスラブに切る） |
 | `omx_model.py` | URDF → MJCF。形・質量・慣性は URDF のもの。車体（板・LiDAR・車輪・キャスター）の仮定もここ（`VARIANTS`） |
-| `sim_common.py` | `Sim`（衝突の深さ `depths`、重力保持トルク `hold_torque`）、`arm_kin.js` と同じ解析 FK・IK |
+| `sim_common.py` | `Sim`（衝突の深さ `depths`、重力保持トルク `hold_torque`）、以前の画面の `arm_kin.js` と同じ解析 FK・IK |
 | `sweep.py` | 全探索（関節空間グリッド、手先位置の IK グリッド、`joint1` の向きごとの車体衝突、トルク）。22 並列（`ctx.Pool(22)` と決め打ち）。結果は `out/*.npz` |
 | `analyze.py` → `export.py` | 集計 → `workspace.json` / `joint_space.json` / 図 |
 | `extra_checks.py` | 感度・検算 → `sensitivity.json` |
 | `calibrate.py` | モデルの検証（MuJoCo の手先位置 = 解析 FK、実機確認済みの姿勢が衝突なしと出るか） |
-| `export_reach.py` | `workspace.json` から画面用の `pc/server/webui/reach.json`（72 KB）を作る |
 | `dance_search.py` | Dance の動きの中心と大きさを探す |
 | `path_check.py` / `jog_predict.py` | 関節空間の直線補間に沿った衝突の確認 / 手先操作で止まる位置の予測 |
 | `selftest.py` | 既知の 4 姿勢で期待どおりの判定になるか（`tests/run_tests.sh` が動かす） |
@@ -109,7 +109,7 @@ OFFSET = [0, 0.93, 0.07, -1.65]   [rad]（joint1, joint2, joint3, joint4）
 
 - README の再実行の行は Windows の `.venv\Scripts\python.exe` を使っている。Linux / WSL では `python3`（`mujoco` と `numpy`、図のために `matplotlib`）。
 - `out/*.npz` は `.gitignore` で除いてあるので、`analyze.py` / `export.py` の前に `sweep.py all`（22 並列で約 4 分）を動かす。コア数が少ない PC では、`sweep.py` の `ctx.Pool(22, ...)` を減らす。
-- 結果を画面に反映するには、`export_reach.py` で `pc/server/webui/reach.json` を作り直す。`LIMITS` を変えたときは `arm_kin.js` も直す。
+- `LIMITS` を変えたときは、画面（`index.html`）の `LIMITS` と、`sim_common.py` の `WEB_LIM` も直す。
 - 車体の仮定を変えるときは `omx_model.py` の寸法（板の前端 `FRONTS`、`PLATE_X_REAR` など）。
 
 ### 仮定が結果に強く効くので、実測してほしいもの

@@ -85,7 +85,7 @@ python3 tb3ctl.py status
 | 項目 | 内容 |
 |---|---|
 | OS | Ubuntu 22.04.5（Raspberry Pi 用、kernel `5.15.0-1061-raspi`）。2026-10-25 に、新しい SD として書き直した（旧 SD の内容は下のバックアップ） |
-| ホスト名・ユーザー | `turtle-destroyer` / `ubuntu`。パスワードログインは無効。ssh できる鍵は、前の担当者の PC の `~/.ssh/id_ed25519_turtlebot` の公開鍵だけ（[10](10-handoff-checklist.md)） |
+| ホスト名・ユーザー | `turtle-destroyer` / `ubuntu`。パスワードログインは無効。ssh できる鍵は `id_ed25519_turtlebot` の公開鍵だけ（組の秘密鍵は `robot/keys/`）（[10](10-handoff-checklist.md)） |
 | ネットワーク | Wi-Fi `Buffalo-G-B7A0` に**だけ**登録。固定 IP `192.168.11.100/24`（ゲートウェイ・DNS `192.168.11.1`）。有線 `eth0` は DHCP（`192.168.11.64` をもらっていた）。`/etc/netplan/50-cloud-init.yaml` を書き換え済みで、cloud-init のネットワーク設定は無効（`/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg`）。書き換え前の控えは `/root/50-cloud-init.yaml.bak-20261026` |
 | ROS | ROS 2 Humble。`~/turtlebot3_ws` には `turtlebot3` / `ld08_driver` / `coin_d4_driver` のソースビルドと、パッチ入りの `turtlebot3_manipulation_hardware`（overlay）。`robot/install_robot.sh` が作るのは `ld08_driver` とパッチ入りプラグインだけで、今の機体より小さい（差は**未検証**） |
 | OpenCR | `turtlebot3_manipulation` V230127R1 を書き込み済み。`~/opencr_update/` に書き込みツール |

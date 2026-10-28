@@ -2,717 +2,174 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>TB-3 Control</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpolygon points='32,4 58,18 58,46 32,60 6,46 6,18' fill='%230e1215' stroke='%23cfd8dc' stroke-width='5'/%3E%3Cpolygon points='32,15 47,23.5 47,40.5 32,49 17,40.5 17,23.5' fill='%233fd9c8'/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TB-3 Companion</title>
 <script src="https://cdn.jsdelivr.net/npm/roslib@1.4.1/build/roslib.min.js"></script>
 <script src="config.js"></script>
-<script src="arm_kin.js"></script>
 <style>
-/* TB-3 操作盤。わざと常にダーク。
-   筐体は鋼板に銘板、表示部は青緑の発光。赤は危険（非常停止・警告）だけに使う。 */
-:root {
-  --bg:#080c0b; --screen:#091110; --steel:#141a1a; --steel-2:#1b2524; --rivet:#344847;
-  --border:rgba(61,255,242,.22); --border-strong:rgba(61,255,242,.5);
-  --text:#a8f0ef; --bright:#d9fffe; --muted:#5f9391; --accent:#3dfff2; --ink:#0b1614;
-  --cream:#c5e7e8; --red:#c8102e; --red-hi:#ff3b4e; --hazard:#30e8f2; --cyan:#7fe0d0;
-  --panel:rgba(61,255,242,.06);
-  --glow:0 0 6px rgba(61,255,242,.55), 0 0 18px rgba(20,255,211,.18);
-  --mono:"SF Mono", ui-monospace, Menlo, "Cascadia Mono", Consolas, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", monospace;
-  --display:"Futura Condensed ExtraBold", "Futura-CondensedExtraBold", "DIN Condensed", "Bahnschrift Condensed", Impact, sans-serif;
-  --label:"DIN Condensed", "Futura Condensed Medium", "Bahnschrift SemiBold Condensed", "Arial Narrow", Impact, sans-serif;
-  --script:"Brush Script MT", "Snell Roundhand", cursive;
-  color-scheme:dark;
-}
+:root { --bg:#10181a; --panel:#18252a; --line:#2c4046; --text:#d6e6e8; --muted:#7c969b; --accent:#3fd9c8; --red:#d6334a; --warn:#e0a82e; color-scheme:dark; }
 * { box-sizing:border-box; }
-html, body { margin:0; background:var(--bg); color:var(--text); font:14px/1.6 var(--mono); }
-body { min-height:100vh; background:radial-gradient(ellipse at 50% -10%, #082a24 0, var(--bg) 60%); }
-button, input { font:inherit; color:inherit; }
-button { cursor:pointer; border:1px solid var(--border-strong); background:transparent; border-radius:3px; padding:6px 12px;
-  font-family:var(--label); text-transform:uppercase; letter-spacing:.12em; font-size:14px; line-height:1.4;
-  transition:color .15s, border-color .15s, background .15s, transform .08s; -webkit-tap-highlight-color:transparent; }
-button:hover { border-color:var(--accent); color:var(--accent); }
-button:active { transform:translateY(1px); }
-button:focus-visible, input:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
-button.primary { background:var(--red); color:var(--cream); border-color:#7d0a1c; font-weight:700;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.25), 0 3px 0 #5a0613, 0 4px 10px rgba(0,0,0,.5); }
-button.primary:hover { background:#e01737; color:#ffffff; }
-button.primary:active { box-shadow:inset 0 1px 0 rgba(255,255,255,.2), 0 1px 0 #5a0613; transform:translateY(2px); }
-
-/* ---- ブラウン管の効果（操作の邪魔にならない程度） ---- */
-#crt { position:fixed; inset:0; pointer-events:none; z-index:60; }
-#crt::before { content:""; position:absolute; inset:0; background:repeating-linear-gradient(0deg, rgba(0,0,0,.13) 0 1px, transparent 1px 3px); }
-#crt::after { content:""; position:absolute; left:0; right:0; height:22vh; top:-22vh;
-  background:linear-gradient(transparent, rgba(120,255,240,.04), transparent); animation:roll 9s linear infinite; }
-@keyframes roll { to { transform:translateY(130vh); } }
-body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:59;
-  background:radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,.6) 100%); }
-body.fx-off #crt, body.fx-off::before { display:none; }
-
-/* ---- 筐体の上部 ---- */
-header { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:14px; padding:10px 16px;
-  background:linear-gradient(180deg, rgba(255,255,255,.03), transparent), var(--steel); border-bottom:3px solid #060a09; box-shadow:0 1px 0 var(--rivet); }
-.brand { display:flex; align-items:center; gap:10px; min-width:0; }
-.brand svg { width:40px; height:40px; flex:none; filter:drop-shadow(0 2px 0 #000000); }
-.brand .name { font-family:var(--display); font-size:26px; line-height:.9; color:var(--cream); letter-spacing:.02em;
-  text-shadow:2px 2px 0 var(--red), 3px 3px 0 #000000; white-space:nowrap; }
-.brand .name sup { font-size:.35em; color:var(--accent); text-shadow:none; vertical-align:top; }
-.brand .sub { font-family:var(--label); font-size:11px; letter-spacing:.3em; color:var(--muted); text-transform:uppercase; white-space:nowrap; }
-.lamp { display:flex; align-items:center; gap:7px; font-family:var(--label); font-size:12px; letter-spacing:.2em; text-transform:uppercase;
-  color:var(--muted); padding:3px 10px; border:1px solid var(--rivet); border-radius:2px; background:var(--ink); white-space:nowrap; }
-.lamp i { width:10px; height:10px; border-radius:50%; background:#1b3734; box-shadow:inset 0 -1px 2px rgba(0,0,0,.6); }
-.lamp.on { color:var(--accent); } .lamp.on i { background:var(--accent); box-shadow:0 0 8px var(--accent); }
-.lamp.err { color:var(--red-hi); } .lamp.err i { background:var(--red-hi); box-shadow:0 0 8px var(--red-hi); animation:pulse 1s infinite; }
-@keyframes pulse { 50% { opacity:.4; } }
-.spacer { flex:1; }
-#fx { font-size:11px; padding:3px 8px; color:var(--muted); border-color:var(--rivet); }
-#estop { position:relative; width:84px; height:84px; margin:-6px 0; border-radius:50%; padding:0; border:6px solid transparent; flex:none;
-  background:radial-gradient(circle at 50% 38%, #ff4a5c, #c8102e 55%, #7d0a1c) padding-box, var(--chrome) border-box;
-  color:#fff3f3; font-family:var(--display); font-size:15px; line-height:1; letter-spacing:.06em;
-  box-shadow:0 5px 0 #000000, 0 0 22px rgba(200,16,46,.45); text-shadow:1px 1px 0 #000000; }
-#estop:hover { color:#ffffff; filter:brightness(1.1); }
-#estop:active { transform:translateY(3px); box-shadow:0 2px 0 #000000; }
-#estop small { display:block; font-family:var(--label); font-size:9px; letter-spacing:.2em; margin-top:3px; opacity:.85; }
-
-.hazard-band { overflow:hidden; white-space:nowrap; border-bottom:2px solid #000000;
-  background:linear-gradient(180deg, #2a3238, #151a1e); padding:5px 0; }
-.ticker { display:inline-flex; animation:tick 46s linear infinite; }
-.ticker span { color:var(--accent); font-family:var(--label); font-size:13px; letter-spacing:.2em; text-transform:uppercase;
-  padding:1px 18px; margin-right:40px; border-left:2px solid var(--accent); }
-@keyframes tick { to { transform:translateX(-50%); } }
-body.fx-off .ticker { animation:none; }
-
-/* ---- 盤面 ---- */
-main { display:grid; grid-template-columns:repeat(12, 1fr); gap:16px; padding:18px 16px 10px; max-width:1240px; margin:0 auto; }
-.unit { grid-column:span 4; position:relative; background:linear-gradient(180deg, rgba(255,255,255,.025), transparent 30%), var(--steel);
-  border:1px solid #060a09; border-radius:6px; padding:34px 16px 16px; box-shadow:inset 0 0 0 1px var(--rivet), 0 6px 0 #000000, 0 10px 24px rgba(0,0,0,.5); }
-.unit::before, .unit::after { content:""; position:absolute; top:9px; width:7px; height:7px; border-radius:50%;
-  background:radial-gradient(circle at 35% 35%, #618584, #1d2a2a); box-shadow:0 1px 0 #000000; }
-.unit::before { left:9px; } .unit::after { right:9px; }
-.plate { position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:var(--cream); color:var(--ink);
-  font-family:var(--label); font-weight:700; font-size:13px; letter-spacing:.26em; text-transform:uppercase; padding:3px 16px 2px;
-  border-radius:2px; box-shadow:0 2px 0 #000000, inset 0 -1px 0 rgba(0,0,0,.25); white-space:nowrap; }
-.plate em { font-style:normal; color:var(--red); }
-.screen { background:var(--screen); border:1px solid #000000; border-radius:4px; box-shadow:inset 0 0 0 1px rgba(61,255,242,.1), inset 0 0 30px rgba(0,0,0,.8); }
-.caption { font-family:var(--label); font-size:11px; letter-spacing:.24em; text-transform:uppercase; color:var(--muted); }
-.fine { font-size:11px; color:var(--muted); margin:10px 0 0; }
-
-/* 走行 */
-.gauges { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.gauge { margin:0; padding:10px 8px 8px; text-align:center; }
-.gauge svg { width:100%; max-width:150px; display:block; margin:0 auto; background:var(--cream); border-radius:50% 50% 6px 6px / 75% 75% 6px 6px; padding:4px 4px 0; }
-.needle { transform-origin:60px 62px; transform:rotate(-90deg); transition:transform .35s cubic-bezier(.3,1.4,.5,1); }
-.needle line { stroke:var(--ink); stroke-width:3; stroke-linecap:round; } .needle circle { fill:var(--red); }
-.gauge figcaption { margin-top:6px; }
-.gauge b { display:block; font-family:var(--mono); font-weight:400; font-size:18px; color:var(--accent); text-shadow:var(--glow); font-variant-numeric:tabular-nums; }
-.pad { display:grid; grid-template-columns:repeat(3, 76px); grid-template-rows:repeat(2, 70px); gap:10px; justify-content:center; margin:16px 0 14px; user-select:none; -webkit-user-select:none; }
-.pad button { font-size:24px; font-family:var(--mono); letter-spacing:0; color:var(--ink); background:linear-gradient(180deg, #d2f5f6, #a9d3d4);
-  border:1px solid #000000; border-radius:6px; box-shadow:inset 0 1px 0 #ffffff, 0 5px 0 #416666, 0 7px 10px rgba(0,0,0,.5);
-  touch-action:none; -webkit-user-select:none; -webkit-touch-callout:none; }
-.pad button:hover { color:var(--red); border-color:#000000; }
-.pad button.held { transform:translateY(4px); background:linear-gradient(180deg, var(--accent), #12d9c6); box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 1px 0 #416666, 0 0 18px rgba(61,255,242,.5); }
-.row { display:flex; align-items:center; gap:10px; margin:8px 0; }
-.row label { width:96px; flex:none; }
-.row output, .row .now { width:62px; text-align:right; font-variant-numeric:tabular-nums; font-size:13px; }
-.row output { color:var(--accent); text-shadow:var(--glow); }
-.row .now { color:var(--muted); font-size:12px; }
-input[type=range] { -webkit-appearance:none; appearance:none; flex:1; min-width:0; height:22px; background:transparent; }
-input[type=range]::-webkit-slider-runnable-track { height:6px; background:#000000; border:1px solid var(--rivet); border-radius:3px; }
-input[type=range]::-moz-range-track { height:6px; background:#000000; border:1px solid var(--rivet); border-radius:3px; }
-input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:22px; margin-top:-9px; border-radius:2px; border:1px solid #000000;
-  background:linear-gradient(90deg, #a9d3d4, #d2f5f6 45%, #84b3b3); box-shadow:0 2px 0 #000000; }
-input[type=range]::-moz-range-thumb { width:16px; height:22px; border-radius:2px; border:1px solid #000000; background:linear-gradient(90deg, #a9d3d4, #d2f5f6 45%, #84b3b3); }
-
-/* アーム */
-.readout { padding:8px 12px; }
-.btns { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
-.btns button { flex:1 1 auto; }
-.divider { border:0; border-top:1px dashed var(--rivet); margin:16px 0 8px; }
-
-/* レーダー */
-.radar { position:relative; aspect-ratio:1; overflow:hidden; border-radius:50%; border:6px solid #060a09;
-  box-shadow:0 0 0 2px var(--rivet), inset 0 0 40px rgba(0,0,0,.9), 0 0 24px rgba(61,255,242,.12);
-  background:radial-gradient(circle, #071b19 0, #050a0a 70%); }
-.radar canvas { width:100%; height:100%; display:block; }
-.radar .sweep { position:absolute; inset:0; border-radius:50%; pointer-events:none;
-  background:conic-gradient(from 0deg, rgba(61,255,242,.28), rgba(61,255,242,0) 60deg, transparent 360deg); animation:spin 4s linear infinite; }
-@keyframes spin { to { transform:rotate(360deg); } }
-body.fx-off .radar .sweep { animation:none; opacity:0; }
-.radar-meta { display:flex; justify-content:space-between; margin-top:10px; }
-.radar-meta b { color:var(--accent); font-weight:400; text-shadow:var(--glow); }
-
-/* 記録 */
-.log-unit { grid-column:1 / -1; }
-#log { height:110px; overflow:auto; padding:8px 12px; font-size:12px; line-height:1.55; white-space:pre-wrap; color:var(--text); }
-#log .t { color:var(--muted); }
-#log .w { color:var(--red-hi); }
-footer { max-width:1240px; margin:0 auto; padding:6px 16px 24px; display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px 18px; color:var(--muted); font-size:11px; }
-
-
-/* アーム工房: 側面図・手先操作・姿勢と動作列 */
-.workshop { grid-column:1 / -1; }
-.ws-grid { display:grid; grid-template-columns:1.25fr 1fr 1fr; gap:16px; }
-.side canvas { width:100%; display:block; aspect-ratio:3 / 2; }
-.side { padding:6px; }
-.tip { display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; padding:8px 10px; margin-bottom:10px; text-align:center; }
-.tip b { display:block; color:var(--accent); font-weight:400; text-shadow:var(--glow); font-size:15px; font-variant-numeric:tabular-nums; }
-.jog { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; }
-.jog button { padding:10px 6px; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
-.jog button kbd { display:block; font:10px var(--mono); letter-spacing:0; opacity:.6; text-transform:none; margin-top:1px; }
-.jog button.held { color:#022a26; background:linear-gradient(180deg, #7afffa, var(--accent) 45%, #0cc9b5 55%, #32f0df) padding-box, var(--chrome-side) border-box; }
-.lib-row { display:flex; gap:8px; }
-.lib-row input[type=text] { flex:1; min-width:0; background:#000000; border:1px solid var(--rivet); border-radius:3px; color:var(--bright); padding:6px 8px; font:13px var(--mono); }
-.list { list-style:none; margin:8px 0 0; padding:6px; max-height:170px; overflow:auto; }
-.list li { display:flex; align-items:center; gap:6px; padding:4px 4px; border-bottom:1px dashed rgba(61,255,242,.14); font-size:13px; }
-.list li:last-child { border-bottom:0; }
-.list li .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.list li button { padding:2px 8px; font-size:11px; }
-.list li input[type=number] { width:56px; background:#000000; border:1px solid var(--rivet); color:var(--accent); border-radius:2px; padding:2px 4px; font:12px var(--mono); }
-.list li.now { background:rgba(61,255,242,.12); }
-.list .empty { color:var(--muted); font-size:12px; border:0; }
-.seq-ctl { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:10px; }
-.seq-ctl label { display:flex; align-items:center; gap:6px; }
-.ws-title { margin:0 0 6px; }
-@media (max-width:1000px) { .ws-grid { grid-template-columns:1fr; } }
-
-/* 操作しやすさ: モード切替・ジョイスティック・ワンタップ姿勢・早見表 */
-.modes { display:none; position:sticky; top:66px; z-index:15; gap:8px; padding:8px 12px; background:rgba(8,12,11,.92); border-bottom:1px solid #000000; }
-.modes button { flex:1; }
-.modes button.on { color:#022a26; }
-@media (max-width:1000px) {   /* 盤を絞るのはスマホ・タブレット幅だけ */
-  body[data-mode="drive"] .unit[data-mode]:not([data-mode="drive"]),
-  body[data-mode="arm"] .unit[data-mode]:not([data-mode="arm"]) { display:none; }
-}
-.drive-pads { display:flex; align-items:center; justify-content:center; gap:22px; margin:16px 0 10px; flex-wrap:wrap; }
-.drive-pads .pad { margin:0; grid-template-columns:repeat(3, 56px); grid-template-rows:repeat(2, 52px); gap:7px; }
-.drive-pads .pad button { font-size:18px; }
-.stick { position:relative; width:170px; height:170px; border-radius:50%; touch-action:none; cursor:grab; flex:none;
-  background:radial-gradient(circle, #151c1c 0 55%, #080b0b 70%), #000000; border:4px solid transparent;
-  background-clip:padding-box; box-shadow:0 0 0 3px #7a8888, 0 0 0 5px #16191a, inset 0 6px 18px rgba(0,0,0,.9); }
-.stick .ring { position:absolute; inset:18%; border-radius:50%; border:1px dashed rgba(61,255,242,.35); }
-.stick::before, .stick::after { content:""; position:absolute; background:rgba(61,255,242,.18); }
-.stick::before { left:50%; top:8%; bottom:8%; width:1px; } .stick::after { top:50%; left:8%; right:8%; height:1px; }
-.knob { position:absolute; left:50%; top:50%; width:64px; height:64px; margin:-32px 0 0 -32px; border-radius:50%; z-index:1;
-  background:radial-gradient(circle at 38% 30%, #ffffff, #c8d6d6 30%, #7e8b8b 70%, #414c4c); box-shadow:0 6px 10px rgba(0,0,0,.7), inset 0 -3px 6px rgba(0,0,0,.35); }
-.stick.active .knob { background:radial-gradient(circle at 38% 30%, #d0fdff, var(--accent) 35%, #08b09c 80%); box-shadow:0 0 22px rgba(61,255,242,.6); }
-.presets, .quick { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin:6px 0 10px; }
-.quick { grid-template-columns:repeat(4, 1fr); margin:0 0 10px; }
-.presets button kbd, .quick button kbd, .grip-big kbd { display:block; font:10px var(--mono); letter-spacing:0; opacity:.6; text-transform:none; }
-.presets button.on { color:#022a26; }
-.orbit { margin:14px 0 6px; padding-top:12px; border-top:2px groove #505b5c; }
-.orbit-ctl { grid-template-columns:1fr 1fr 1.4fr; align-items:center; }
-.checks { display:flex; gap:18px; margin:6px 0 10px; }
-.checks label { display:flex; align-items:center; gap:6px; }
-.orbit-ctl .fold { display:flex; align-items:center; gap:6px; font-size:11px; line-height:1.2; }
-#cStatus { margin-top:10px; padding:8px 12px; min-height:3.2em; white-space:pre-line; }
-#cStatus.run { color:var(--accent); } #cStatus.warn { color:var(--red-hi); }
-.grip-big { width:100%; padding:12px; margin-bottom:12px; font-size:16px; }
-.side canvas { cursor:crosshair; touch-action:none; }
-dialog#help { max-width:560px; width:calc(100% - 24px); color:var(--text); background:var(--steel); border:3px solid #7a8888; border-radius:8px; padding:30px 18px 16px; box-shadow:0 20px 60px rgba(0,0,0,.8); }
-dialog#help::backdrop { background:rgba(0,0,0,.6); }
-dialog#help .plate { top:-14px; }
-dialog#help table { width:100%; border-collapse:collapse; font-size:13px; }
-dialog#help th { text-align:left; font-family:var(--label); letter-spacing:.2em; color:var(--accent); padding:10px 0 4px; border-bottom:1px solid var(--rivet); }
-dialog#help td { padding:4px 6px 4px 0; border-bottom:1px dashed rgba(61,255,242,.12); vertical-align:top; }
-dialog#help td:first-child { white-space:nowrap; color:var(--bright); width:40%; }
-kbd { font:11px var(--mono); padding:0 4px; border:1px solid var(--rivet); border-radius:3px; background:#000000; color:var(--accent); }
-.btns kbd, .jog kbd, .presets kbd, .quick kbd, .grip-big kbd { border:0; background:none; padding:0; color:inherit; }
-#helpBtn { padding:3px 10px; }
-#padLamp { display:none; } #padLamp.on { display:flex; }
-@media (max-width:1000px) {
-  .modes { display:flex; }
-  .unit.radar-unit .radar { max-width:360px; }
-}
-@media (max-width:700px) { .modes { top:56px; } .quick { grid-template-columns:repeat(2, 1fr); } #helpBtn { display:none; } }
-
-/* ---- 金属仕上げ: ヘアライン加工の鋼板、クロームの縁、削り出しのボタン ---- */
-:root {
-  --hairline:repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, rgba(0,0,0,.05) 1px 2px, rgba(255,255,255,.015) 2px 4px);
-  --chrome:linear-gradient(180deg, #ebf3f3 0%, #99a7a7 18%, #505b5c 45%, #252a2a 52%, #7a8888 78%, #d9e4e5 100%);
-  --chrome-side:linear-gradient(90deg, #5f6b6b, #cad6d6 20%, #7c8989 50%, #d7e2e3 80%, #525d5e);
-  --gunmetal:linear-gradient(180deg, #363c3c 0%, #26292a 22%, #1b1e1f 60%, #272b2b 100%);
-  --alu:linear-gradient(180deg, #e4eded 0%, #bbc7c8 45%, #98a5a5 55%, #c9d4d5 100%);
-}
-body { background:var(--hairline), radial-gradient(ellipse at 50% -10%, #283837 0, #0b0e0e 65%); }
-header { background:var(--hairline), linear-gradient(180deg, #4c5556 0%, #292e2e 48%, #181b1c 52%, #252929 100%);
-  border-bottom:0; box-shadow:0 2px 0 #000000, inset 0 1px 0 rgba(255,255,255,.35), inset 0 -2px 0 rgba(255,255,255,.08); }
-.brand .name { background:linear-gradient(180deg, #ffffff 0%, #d8e7e7 40%, #8c9a9a 52%, #e5f0f1 70%, #acbbbb 100%);
-  -webkit-background-clip:text; background-clip:text; color:transparent; text-shadow:none;
-  filter:drop-shadow(2px 2px 0 var(--red)) drop-shadow(1px 1px 0 #000000); }
-.lamp { border:2px solid transparent; border-radius:3px; background:linear-gradient(#080c0c, #080c0c) padding-box, var(--chrome) border-box; }
-#fx { border:2px solid transparent; background:linear-gradient(#202525, #16191a) padding-box, var(--chrome) border-box; color:#b6c7c7; }
-#estop { border-width:7px; box-shadow:0 0 0 3px #14181b, 0 0 0 5px #b6c0c4, 0 6px 0 #000000, 0 0 26px rgba(200,16,46,.5); }
-
-.unit { border:3px solid transparent; border-radius:8px;
-  background:var(--hairline) padding-box, linear-gradient(180deg, rgba(255,255,255,.09), transparent 18%, transparent 82%, rgba(255,255,255,.04)) padding-box, var(--gunmetal) padding-box, var(--chrome) border-box;
-  box-shadow:0 8px 0 #000000, 0 14px 30px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.18); }
-.unit::before, .unit::after { width:10px; height:10px; top:10px;
-  background:radial-gradient(circle at 35% 30%, #ffffff 0, #bfcdcd 25%, #606c6c 60%, #252a2a 100%); box-shadow:0 1px 1px #000000, inset 0 0 0 1px rgba(0,0,0,.4); }
-.unit::before { left:10px; } .unit::after { right:10px; }
-.plate { border:2px solid transparent; border-radius:3px; color:#171a1b; text-shadow:0 1px 0 rgba(255,255,255,.6);
-  background:var(--hairline) padding-box, var(--alu) padding-box, var(--chrome) border-box;
-  box-shadow:0 3px 0 #000000, 0 4px 8px rgba(0,0,0,.5); }
-.screen { border:3px solid transparent; border-radius:6px;
-  background:radial-gradient(ellipse at 50% 0%, rgba(61,255,242,.07), transparent 60%) padding-box, linear-gradient(var(--screen), #060a09) padding-box, var(--chrome) border-box;
-  box-shadow:inset 0 0 26px rgba(0,0,0,.9), inset 0 0 0 1px rgba(61,255,242,.12), 0 2px 0 rgba(255,255,255,.08); }
-.gauge svg { border:3px solid transparent; background:linear-gradient(#d0eaeb, #abd3d4) padding-box, var(--chrome) border-box;
-  box-shadow:inset 0 3px 8px rgba(0,0,0,.35), 0 2px 0 #000000; }
-
-button { border:2px solid transparent; color:#171a1b; text-shadow:0 1px 0 rgba(255,255,255,.55);
-  background:var(--hairline) padding-box, var(--alu) padding-box, var(--chrome-side) border-box;
-  box-shadow:inset 0 1px 0 #ffffff, 0 3px 0 #080a09, 0 4px 8px rgba(0,0,0,.45); }
-button:hover { color:var(--red); border-color:transparent; filter:brightness(1.06); }
-button:active { transform:translateY(2px); box-shadow:inset 0 1px 0 #ffffff, 0 1px 0 #080a09; }
-button.primary { color:var(--cream); text-shadow:0 1px 0 #3d0610;
-  background:linear-gradient(180deg, #ff5a6a 0%, var(--red) 45%, #8f0b20 55%, #c8102e 100%) padding-box, var(--chrome-side) border-box; }
-button.primary:hover { color:#ffffff; filter:brightness(1.1); }
-.pad button { border:3px solid transparent; border-radius:10px; color:#171a1b;
-  background:radial-gradient(ellipse at 50% 20%, rgba(255,255,255,.7), transparent 55%) padding-box, var(--hairline) padding-box, var(--alu) padding-box, var(--chrome) border-box;
-  box-shadow:inset 0 2px 0 #ffffff, inset 0 -3px 6px rgba(0,0,0,.25), 0 6px 0 #080a09, 0 8px 14px rgba(0,0,0,.55); }
-.pad button.held { color:#022a26; transform:translateY(5px);
-  background:radial-gradient(ellipse at 50% 20%, rgba(255,255,255,.6), transparent 55%) padding-box, linear-gradient(180deg, #7afffa, var(--accent) 45%, #0cc9b5 55%, #32f0df) padding-box, var(--chrome) border-box;
-  box-shadow:inset 0 2px 0 rgba(255,255,255,.6), 0 1px 0 #080a09, 0 0 22px rgba(61,255,242,.55); }
-input[type=range]::-webkit-slider-runnable-track { height:8px; border:0; border-radius:4px; background:linear-gradient(180deg, #000000, #252a2a); box-shadow:inset 0 1px 2px #000000, 0 1px 0 rgba(255,255,255,.12); }
-input[type=range]::-moz-range-track { height:8px; border:0; border-radius:4px; background:linear-gradient(180deg, #000000, #252a2a); }
-input[type=range]::-webkit-slider-thumb { width:18px; height:24px; margin-top:-8px; border-radius:3px; border:1px solid #000000;
-  background:var(--hairline), linear-gradient(90deg, #7d8a8a, #f5fafa 40%, #b4c1c1 60%, #6c7878); box-shadow:0 2px 0 #000000, inset 0 1px 0 #ffffff; }
-input[type=range]::-moz-range-thumb { width:18px; height:24px; border-radius:3px; border:1px solid #000000; background:linear-gradient(90deg, #7d8a8a, #f5fafa 40%, #b4c1c1 60%, #6c7878); }
-.radar { border:0; padding:8px; background:conic-gradient(from 210deg, #e8f1f1, #5f6b6b, #d6e1e2, #444e4d, #e8f1f1, #6b7675, #e8f1f1) ;
-  box-shadow:0 0 0 2px #000000, 0 6px 0 #000000, 0 0 30px rgba(61,255,242,.12); }
-.radar canvas { border-radius:50%; background:radial-gradient(circle, #071b19 0, #050a0a 70%); box-shadow:inset 0 0 40px rgba(0,0,0,.95); }
-.radar .sweep { inset:8px; }
-.divider { border-top:2px groove #505b5c; }
-.modes button.on, .presets button.on, .grip-big.open, .orbit-ctl button.on { color:#022a26;
-  background:linear-gradient(180deg, #7afffa, var(--accent) 45%, #0cc9b5 55%, #32f0df) padding-box, var(--chrome-side) border-box; }
-
-@media (max-width:1000px) {
-  .unit { grid-column:span 6; }
-  .radar-unit { grid-column:1 / -1; }
-  .radar { max-width:460px; margin:0 auto; }
-}
-@media (max-width:700px) {
-  main { gap:22px; padding:20px 12px 10px; }
-  .unit { grid-column:1 / -1; }
-  header { padding:8px 12px; gap:10px; }
-  .brand .name { font-size:19px; } .brand .sub, #fx { display:none; }
-  .brand svg { width:32px; height:32px; }
-  #estop { width:70px; height:70px; font-size:13px; }
-  .pad { grid-template-columns:repeat(3, 84px); grid-template-rows:repeat(2, 76px); }
-}
-@media (max-width:440px) {
-  .lamp { padding:6px; } .lamp span { display:none; }
-}
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 system-ui, "Yu Gothic UI", sans-serif; }
+header { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--line); }
+header h1 { font-size:16px; margin:0; flex:1; }
+#conn { padding:2px 10px; border-radius:10px; background:#333; font-size:12px; }
+#conn.on { background:#17624f; } #conn.err { background:#7a2330; }
+main { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px; padding:12px 16px; }
+section { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:12px; }
+h2 { font-size:13px; margin:0 0 8px; color:var(--accent); letter-spacing:.04em; }
+button { background:#22363c; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:6px 12px; font:inherit; cursor:pointer; }
+button:hover { border-color:var(--accent); } button:active { transform:translateY(1px); }
+button.go { background:#17624f; } button.stop { background:var(--red); border-color:var(--red); font-weight:700; }
+button.held { background:var(--accent); color:#06231f; }
+.row { display:flex; align-items:center; gap:8px; margin:6px 0; } .row label { width:84px; color:var(--muted); font-size:12px; }
+.row input[type=range] { flex:1; } .row output { width:62px; text-align:right; font-variant-numeric:tabular-nums; }
+.row .now { width:54px; text-align:right; color:var(--muted); font-variant-numeric:tabular-nums; }
+.pad { display:grid; grid-template-columns:repeat(3, 64px); grid-template-rows:repeat(2, 52px); gap:6px; justify-content:center; margin:8px 0; }
+.pad button { font-size:20px; } .pad .w { grid-column:2; }
+.btns { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.status { margin-top:8px; padding:6px 8px; background:#0b1214; border-radius:4px; white-space:pre-wrap; font:12px/1.5 ui-monospace, Consolas, monospace; min-height:3.2em; }
+.status.run { color:var(--accent); } .status.warn { color:var(--warn); }
+.fine { color:var(--muted); font-size:12px; margin:6px 0 0; }
+#scan { width:100%; max-width:320px; display:block; margin:0 auto; background:#0b1214; border-radius:4px; }
+#log { height:140px; overflow:auto; font:12px/1.5 ui-monospace, Consolas, monospace; background:#0b1214; border-radius:4px; padding:6px 8px; }
+#log .t { color:var(--muted); } #log .w { color:var(--warn); }
+.wide { grid-column:1 / -1; }
 </style>
 </head>
 <body>
-<div id="crt"></div>
-
 <header>
-  <div class="brand">
-    <svg viewBox="0 0 64 64" aria-hidden="true"><polygon points="32,4 58,18 58,46 32,60 6,46 6,18" fill="none" stroke="#cfd8dc" stroke-width="5" stroke-linejoin="round"/><polygon points="32,15 47,23.5 47,40.5 32,49 17,40.5 17,23.5" fill="#3fd9c8" stroke="#0e1215" stroke-width="2"/><path d="M32 15 V49 M17 23.5 L47 40.5 M47 23.5 L17 40.5" stroke="#0e1215" stroke-width="1.6" fill="none"/></svg>
-    <div>
-      <div class="name">TB-3 COMPANION</div>
-      <div class="sub">TurtleBot3 + OpenManipulator-X</div>
-    </div>
-  </div>
-  <div class="lamp" id="conn"><i></i><span>Offline</span></div>
-  <div class="spacer"></div>
-  <div class="lamp" id="padLamp" title="ゲームパッド"><i></i><span>No Pad</span></div>
-  <button id="helpBtn" title="操作の早見表（?）">?</button>
-  <button id="fx" title="画面効果（走査線など）のオン/オフ">FX</button>
-  <button id="estop" title="非常停止（Esc / Space）">STOP<small>EMERGENCY</small></button>
+  <h1>TB-3 Companion</h1>
+  <span id="conn">Offline</span>
+  <button id="estop" class="stop" title="Esc / Space">STOP</button>
 </header>
-<div class="hazard-band" aria-hidden="true"><div class="ticker" id="ticker"></div></div>
-<nav class="modes" id="modes">
-  <button data-mode="drive">Drive</button><button data-mode="arm">Arm</button><button data-mode="all">All</button>
-</nav>
-
-<dialog id="help">
-  <div class="plate">Operator <em>Manual</em></div>
-  <table>
-    <tr><th colspan="2">走行</th></tr>
-    <tr><td><kbd>W A S D</kbd> / 矢印</td><td>押している間だけ走る</td></tr>
-    <tr><td>ジョイスティック</td><td>倒した量で速さが変わる</td></tr>
-    <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></td><td>速度 SLOW / NORMAL / FAST</td></tr>
-    <tr><th colspan="2">アーム</th></tr>
-    <tr><td><kbd>I</kbd> <kbd>K</kbd></td><td>手先 前 / 後</td></tr>
-    <tr><td><kbd>R</kbd> <kbd>F</kbd></td><td>手先 上 / 下</td></tr>
-    <tr><td><kbd>T</kbd> <kbd>G</kbd></td><td>手先を上に傾ける / 下に傾ける</td></tr>
-    <tr><td><kbd>J</kbd> <kbd>L</kbd></td><td>アームを左 / 右に回す</td></tr>
-    <tr><td><kbd>O</kbd></td><td>グリッパー 開く / 閉じる（切り替え）</td></tr>
-    <tr><td><kbd>Y</kbd> <kbd>H</kbd></td><td>READY 姿勢 / HOME 姿勢</td></tr>
-    <tr><td>側面図をタップ</td><td>その位置へ手先を動かす</td></tr>
-    <tr><th colspan="2">ゲームパッド</th></tr>
-    <tr><td>左スティック</td><td>走行</td></tr>
-    <tr><td>右スティック</td><td>上下 = 手先の上下、左右 = アームの旋回</td></tr>
-    <tr><td>十字キー ↑↓</td><td>手先 前 / 後</td></tr>
-    <tr><td>L1 / R1</td><td>手先を上に / 下に傾ける</td></tr>
-    <tr><td>L2 / R2</td><td>グリッパー 閉じる / 開く</td></tr>
-    <tr><td>△(Y) / □(X)</td><td>READY / HOME</td></tr>
-    <tr><td>○(B)</td><td>非常停止</td></tr>
-    <tr><th colspan="2">共通</th></tr>
-    <tr><td><kbd>Space</kbd> <kbd>Esc</kbd></td><td>非常停止（走行停止・アームはその場で保持）</td></tr>
-    <tr><td><kbd>?</kbd></td><td>この表</td></tr>
-  </table>
-  <div class="btns"><button id="helpClose" class="primary">Close</button></div>
-</dialog>
-
 <main>
-  <section class="unit" data-mode="drive">
-    <div class="plate">Drive <em>Control</em></div>
-    <div class="gauges">
-      <figure class="gauge screen">
-        <svg viewBox="0 0 120 70" aria-hidden="true"><path d="M12 62 A48 48 0 0 1 108 62" fill="none" stroke="#0b1614" stroke-width="2"/><path d="M92 28 A48 48 0 0 1 108 62" fill="none" stroke="#c8102e" stroke-width="6"/><g stroke="#0b1614" stroke-width="2"><line x1="12" y1="62" x2="20" y2="62"/><line x1="26" y1="28" x2="32" y2="34"/><line x1="60" y1="14" x2="60" y2="22"/><line x1="94" y1="28" x2="88" y2="34"/><line x1="108" y1="62" x2="100" y2="62"/></g><g class="needle" id="needleV"><line x1="60" y1="62" x2="60" y2="20"/><circle cx="60" cy="62" r="5"/></g></svg>
-        <figcaption class="caption">Velocity<b id="vNow">+0.00</b>m/s</figcaption>
-      </figure>
-      <figure class="gauge screen">
-        <svg viewBox="0 0 120 70" aria-hidden="true"><path d="M12 62 A48 48 0 0 1 108 62" fill="none" stroke="#0b1614" stroke-width="2"/><path d="M12 62 A48 48 0 0 1 28 28" fill="none" stroke="#c8102e" stroke-width="6"/><path d="M92 28 A48 48 0 0 1 108 62" fill="none" stroke="#c8102e" stroke-width="6"/><g stroke="#0b1614" stroke-width="2"><line x1="12" y1="62" x2="20" y2="62"/><line x1="26" y1="28" x2="32" y2="34"/><line x1="60" y1="14" x2="60" y2="22"/><line x1="94" y1="28" x2="88" y2="34"/><line x1="108" y1="62" x2="100" y2="62"/></g><g class="needle" id="needleW"><line x1="60" y1="62" x2="60" y2="20"/><circle cx="60" cy="62" r="5"/></g></svg>
-        <figcaption class="caption">Rotation<b id="wNow">+0.00</b>rad/s</figcaption>
-      </figure>
+  <section>
+    <h2>Drive</h2>
+    <div class="pad">
+      <button class="w" data-k="w">▲</button>
+      <button data-k="a">◀</button><button data-k="s">▼</button><button data-k="d">▶</button>
     </div>
-    <div class="drive-pads">
-      <div class="stick" id="stick" aria-label="走行ジョイスティック"><div class="ring"></div><div class="knob" id="knob"></div></div>
-      <div class="pad">
-        <span></span><button data-k="w" aria-label="前進">▲</button><span></span>
-        <button data-k="a" aria-label="左旋回">◀</button><button data-k="s" aria-label="後退">▼</button><button data-k="d" aria-label="右旋回">▶</button>
-      </div>
-    </div>
-    <div class="presets" id="speedPresets">
-      <button data-speed="slow">Slow<kbd>1</kbd></button><button data-speed="normal">Normal<kbd>2</kbd></button><button data-speed="fast">Fast<kbd>3</kbd></button>
-    </div>
-    <div class="orbit" id="orbit">
-      <div class="caption ws-title">Orbit · 円を描いて走り続ける</div>
-      <div class="row"><label class="caption">Radius</label><input id="cR" type="range" min="0.20" max="0.60" step="0.05" value="0.30"><output id="cRO"></output></div>
-      <div class="row"><label class="caption">Speed</label><input id="cV" type="range" min="0.03" max="0.15" step="0.01" value="0.10"><output id="cVO"></output></div>
-      <div class="presets orbit-ctl">
-        <button data-cdir="left" class="on">↺ Left</button><button data-cdir="right">↻ Right</button>
-        <label class="caption fold"><input type="checkbox" id="cFold" checked> Fold arm first</label>
-      </div>
-      <div class="btns"><button class="primary" id="cStart">Start Orbit</button><button id="cStop">Stop</button></div>
-      <button class="primary grip-big" id="allStart" style="margin-top:10px">ALL MOTORS<kbd>Orbit + 4 joints + Gripper</kbd></button>
-      <div class="screen readout" id="cStatus">OFF</div>
-      <p class="fine">機体が PC と通信し続けて円を描きます。PC かネットワークが止まると機体は 0.5 秒で止まります。LiDAR で進路を見て、障害物があれば止まり、空くと自動で再開します。周りに半径 + 40 cm の空きを作り、充電ケーブルは外してください。</p>
-    </div>
-    <div class="row"><label class="caption">Max Speed</label><input id="vmax" type="range" min="0.02" max="0.22" step="0.01" value="0.12"><output id="vmaxO"></output></div>
-    <div class="row"><label class="caption">Max Turn</label><input id="wmax" type="range" min="0.1" max="1.8" step="0.1" value="0.8"><output id="wmaxO"></output></div>
-    <p class="fine">ジョイスティックは倒した量で速さが変わります。ボタン・W/A/S/D・矢印キーは押している間だけ。離す・別タブに移ると停止。Space / Esc で非常停止。</p>
+    <div class="row"><label>Max speed</label><input id="vmax" type="range" min="0.02" max="0.22" step="0.01" value="0.12"><output id="vmaxO"></output></div>
+    <div class="row"><label>Max turn</label><input id="wmax" type="range" min="0.1" max="1.8" step="0.1" value="0.8"><output id="wmaxO"></output></div>
+    <p class="fine">W/A/S/D・矢印キー・ボタンは押している間だけ走ります。離す・別タブへ移る・Space / Esc で停止。ゲームパッドは左スティックで走行、○ で停止。</p>
   </section>
 
-  <section class="unit" data-mode="arm">
-    <div class="plate">Manipulator <em>Arm</em></div>
-    <div class="quick">
-      <button data-quick="ready" title="上腕を立て、前腕と手先を水平に（Y）">Ready<kbd>Y</kbd></button>
-      <button data-quick="home" title="旧構成の初期姿勢（H）">Home<kbd>H</kbd></button>
-      <button data-quick="reach" title="手先を前へ水平に伸ばす">Reach</button>
-      <button data-quick="pick" title="手先を下に向けて前の低い所へ">Pick Low</button>
-    </div>
-    <button id="gripToggle" class="grip-big">Gripper · <span id="gripState">—</span><kbd>O</kbd></button>
-    <div class="orbit" id="dance">
-      <div class="caption ws-title">Dance · 全関節とグリッパーを動かし続ける</div>
-      <div class="row"><label class="caption">Size</label><input id="dS" type="range" min="0.3" max="1.0" step="0.05" value="0.9"><output id="dSO"></output></div>
-      <div class="row"><label class="caption">Gripper</label><input id="dG" type="range" min="2" max="8" step="0.5" value="4"><output id="dGO"></output></div>
-      <div class="checks"><label class="caption"><input type="checkbox" id="dArm" checked> 4 Joints</label><label class="caption"><input type="checkbox" id="dGrip" checked> Gripper</label></div>
-      <div class="btns"><button class="primary" id="dStart">Start Dance</button><button id="dStop">Stop</button></div>
-      <div class="screen readout" id="dStatus">OFF</div>
-      <p class="fine">決まった動き（周期 24 秒の波。関節ごとに周期が違うので、どれかが常に動きます）の、先 1.5 秒ぶんの軌道を PC が 0.5 秒ごとに渡し続けます。始める前に、今の姿勢からの経路と動き全体を MuJoCo で調べ、当たらない大きさに自動で縮めます。PC かネットワークが止まると、機体側の見張りが 0.3 秒で気づいて、腕を止めます（約 0.6 秒で止まる）。</p>
-    </div>
-    <div class="screen readout" id="joints"></div>
+  <section>
+    <h2>Orbit · 円を描いて走り続ける</h2>
+    <div class="row"><label>Radius</label><input id="cR" type="range" min="0.20" max="0.60" step="0.05" value="0.30"><output id="cRO"></output></div>
+    <div class="row"><label>Speed</label><input id="cV" type="range" min="0.03" max="0.15" step="0.01" value="0.10"><output id="cVO"></output></div>
+    <div class="row"><label>Direction</label><label style="width:auto"><input type="radio" name="cdir" value="left" checked> 左</label><label style="width:auto"><input type="radio" name="cdir" value="right"> 右</label>
+      <label style="width:auto"><input type="checkbox" id="cFold" checked> 先に腕をたたむ</label></div>
+    <div class="btns"><button class="go" id="cStart">Start Orbit</button><button id="cStop">Stop</button></div>
+    <div class="status" id="cStatus">OFF</div>
+    <p class="fine">PC が指令を出し続けます。PC かネットワークが止まると機体は止まります。周りに半径 + 40 cm を空け、充電ケーブルを外してください。</p>
+  </section>
+
+  <section>
+    <h2>Dance · 全関節とグリッパーを動かし続ける</h2>
+    <div class="row"><label>Size</label><input id="dS" type="range" min="0.3" max="1.0" step="0.05" value="0.6"><output id="dSO"></output></div>
+    <div class="row"><label>Gripper</label><input id="dG" type="range" min="2" max="8" step="0.5" value="4"><output id="dGO"></output></div>
+    <div class="row"><label></label><label style="width:auto"><input type="checkbox" id="dArm" checked> 4 関節</label><label style="width:auto"><input type="checkbox" id="dGrip" checked> グリッパー</label></div>
+    <div class="btns"><button class="go" id="dStart">Start Dance</button><button id="dStop">Stop</button><button class="go" id="allStart">Orbit + Dance</button></div>
+    <div class="status" id="dStatus">OFF</div>
+    <p class="fine">始める前に MuJoCo で衝突を調べ、当たらない大きさに自動で縮めます。</p>
+  </section>
+
+  <section>
+    <h2>Arm</h2>
+    <div id="joints"></div>
+    <div class="row"><label>Gripper</label><input id="grip" type="range" min="-0.010" max="0.019" step="0.001" value="0.004"><output id="gripO"></output><span class="now"></span></div>
     <div class="btns">
-      <button class="primary" id="sendArm">Execute Pose</button>
-      <button id="syncBtn">Read Position</button>
-      <button id="homeBtn">Home</button>
+      <button class="go" id="sendArm">Execute Pose</button><button id="syncBtn">Read Position</button><button id="homeBtn">Home</button>
+      <button id="gripOpen">Open</button><button id="gripClose">Close</button><button id="gripSend">Set Width</button>
     </div>
-    <hr class="divider">
-    <div class="screen readout"><div class="row"><label class="caption">Gripper</label><input id="grip" type="range" min="-0.010" max="0.019" step="0.001" value="0.004"><output id="gripO"></output></div></div>
-    <div class="btns"><button id="gripOpen">Open</button><button id="gripClose">Close</button><button id="gripSend">Set Width</button></div>
-    <p class="fine">スライダーだけでは動きません。「Execute Pose」で 2 秒かけて移動します。右端の灰色の数字が現在値です。</p>
+    <p class="fine">スライダーだけでは動きません。Execute Pose で、衝突を調べてから 2 秒かけて動きます。右の灰色の数字が現在値です。</p>
   </section>
 
-  <section class="unit radar-unit" data-mode="drive">
-    <div class="plate">Proximity <em>Radar</em></div>
-    <div class="radar"><canvas id="scan" width="600" height="600"></canvas><div class="sweep"></div></div>
-    <div class="radar-meta caption"><span>Range 3.0 m</span><span>Nearest <b id="nearest">—</b></span></div>
+  <section>
+    <h2>LiDAR <span style="color:var(--muted);font-weight:400">Nearest <b id="nearest">—</b></span></h2>
+    <canvas id="scan" width="400" height="400"></canvas>
+    <div class="status" id="odom">odom —</div>
   </section>
 
-  <section class="unit workshop" data-mode="arm">
-    <div class="plate">Arm <em>Workshop</em></div>
-    <div class="ws-grid">
-      <div>
-        <div class="caption ws-title">Side View · 青緑=現在 / 赤=目標 / 薄い青緑=今の傾きで届く範囲</div>
-        <div class="screen side"><canvas id="side" width="600" height="400"></canvas></div>
-        <div class="row"><label class="caption">Floor Guard</label><input id="zmin" type="range" min="-0.20" max="0.05" step="0.01" value="-0.08"><output id="zminO"></output></div>
-        <p class="fine">手先がこの高さ（joint2 の軸から測る）より下へは動きません。台の高さに合わせてください。</p>
-      </div>
-      <div>
-        <div class="caption ws-title">Tip Control · 手先を直接動かす</div>
-        <div class="screen tip">
-          <span class="caption">Reach<b id="tipR">—</b></span><span class="caption">Height<b id="tipZ">—</b></span>
-          <span class="caption">Tilt<b id="tipP">—</b></span><span class="caption">Turn<b id="tipY">—</b></span>
-        </div>
-        <div class="jog">
-          <button data-j="r+">Forward<kbd>I</kbd></button><button data-j="r-">Back<kbd>K</kbd></button>
-          <button data-j="z+">Up<kbd>R</kbd></button><button data-j="z-">Down<kbd>F</kbd></button>
-          <button data-j="p+">Tilt Down<kbd>G</kbd></button><button data-j="p-">Tilt Up<kbd>T</kbd></button>
-          <button data-j="y+">Turn Left<kbd>J</kbd></button><button data-j="y-">Turn Right<kbd>L</kbd></button>
-        </div>
-        <div class="row" style="margin-top:12px"><label class="caption">Jog Speed</label><input id="jogv" type="range" min="0.01" max="0.06" step="0.005" value="0.03"><output id="jogvO"></output></div>
-        <p class="fine">押している間だけ手先が動きます。届かない・可動範囲の外・床ガードより下になる向きには進みません。</p>
-      </div>
-      <div>
-        <div class="caption ws-title">Pose Library · 姿勢と動作列</div>
-        <div class="lib-row"><input type="text" id="poseName" placeholder="姿勢の名前" maxlength="32"><button id="poseSave" class="primary">Save Pose</button></div>
-        <ul class="screen list" id="poseList"></ul>
-        <div class="caption ws-title" style="margin-top:12px">Sequence</div>
-        <ul class="screen list" id="seqList"></ul>
-        <div class="seq-ctl">
-          <button id="seqPlay" class="primary">Play</button><button id="seqStop">Stop</button>
-          <label class="caption"><input type="checkbox" id="seqLoop"> Loop</label>
-        </div>
-        <div class="lib-row" style="margin-top:8px">
-          <input type="text" id="seqName" placeholder="動作列の名前" maxlength="32"><button id="seqSave">Save</button><button id="seqLoad">Load</button>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="unit log-unit">
-    <div class="plate">Operations <em>Log</em></div>
-    <div class="screen" id="log"></div>
-  </section>
+  <section class="wide"><h2>Log</h2><div id="log"></div></section>
 </main>
-<footer>
-  <span>tb3-companion · TurtleBot3 + OpenManipulator-X</span>
-  <span>MuJoCo の衝突判定は、車体の板の前端の位置（写真からの推測）に左右されます。動かすときは機体のそばで見ていてください。</span>
-</footer>
 
 <script>
-// ---- 演出 ----
-const TICKER = ["非常停止: Esc / Space / STOP ボタン", "アームの周りに手を入れない", "Orbit の前に、半径 + 40 cm を空け、充電ケーブルを外す", "最初は SLOW、試験用サーバーから", "PC かネットワークが止まると、機体は約 0.6 秒で止まる"];
-document.getElementById("ticker").innerHTML = [...TICKER, ...TICKER].map(t => `<span>${t}</span>`).join("");
-const fxBtn = document.getElementById("fx");
-try { if (localStorage.getItem("tb3-fx") !== "on") document.body.classList.add("fx-off"); } catch {}
-fxBtn.onclick = () => { const off = document.body.classList.toggle("fx-off"); try { localStorage.setItem("tb3-fx", off ? "off" : "on"); } catch {} };
+const $ = (id) => document.getElementById(id);
+const fmt = (v) => (v >= 0 ? "+" : "") + v.toFixed(2);
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const clamp1 = (x) => Math.max(-1, Math.min(1, x));
 
 // ---- 接続 ----
 const host = location.hostname || "localhost";
-const ros = new ROSLIB.Ros({ url: `ws://${host}:${window.TB3_ROSBRIDGE_PORT || 9090}` });
-const conn = document.getElementById("conn");
-const logEl = document.getElementById("log");
+const url = `ws://${host}:${window.TB3_ROSBRIDGE_PORT || 9090}`;
+const ros = new ROSLIB.Ros({ url });
 function log(m, warn = false) {
-  const line = document.createElement("div");
-  line.innerHTML = `<span class="t">${new Date().toLocaleTimeString()}</span> ${warn ? '<span class="w">' : ""}${m}${warn ? "</span>" : ""}`;
-  logEl.prepend(line);
-  while (logEl.childNodes.length > 200) logEl.lastChild.remove();
+  const d = document.createElement("div");
+  d.innerHTML = `<span class="t">${new Date().toLocaleTimeString()}</span> ${warn ? '<span class="w">' : ""}${m}${warn ? "</span>" : ""}`;
+  $("log").prepend(d); while ($("log").childNodes.length > 200) $("log").lastChild.remove();
 }
-const setConn = (cls, text) => { conn.className = "lamp " + cls; conn.querySelector("span").textContent = text; };
-ros.on("connection", () => { setConn("on", "Online"); log("LINK ESTABLISHED · rosbridge"); });
-ros.on("close", () => { setConn("err", "Link Lost"); log("LINK LOST · 3 秒後に再接続", true); setTimeout(() => ros.connect(`ws://${host}:${window.TB3_ROSBRIDGE_PORT || 9090}`), 3000); });
-ros.on("error", () => log("LINK ERROR", true));
-
-// ---- 計器 ----
-function setNeedle(id, value, max) {
-  const r = Math.max(-1, Math.min(1, value / max));
-  document.getElementById(id).style.transform = `rotate(${r * 90}deg)`;
-}
-const fmt = (v) => (v >= 0 ? "+" : "") + v.toFixed(2);
+const setConn = (cls, t) => { $("conn").className = cls; $("conn").textContent = t; };
+ros.on("connection", () => { setConn("on", "Online"); log("rosbridge に接続"); });
+ros.on("close", () => { setConn("err", "Link Lost"); log("接続が切れました。3 秒後に再接続", true); setTimeout(() => ros.connect(url), 3000); });
+ros.on("error", () => log("rosbridge エラー", true));
 
 // ---- 走行 ----
 const cmdVel = new ROSLIB.Topic({ ros, name: "/cmd_vel", messageType: "geometry_msgs/Twist" });
-const held = new Set();
+const held = new Set(), padDrive = { v: 0, w: 0 };
 const keyMap = { w:"w", arrowup:"w", s:"s", arrowdown:"s", a:"a", arrowleft:"a", d:"d", arrowright:"d" };
-const vmax = document.getElementById("vmax"), wmax = document.getElementById("wmax");
-const showMax = () => { vmaxO.textContent = (+vmax.value).toFixed(2); wmaxO.textContent = (+wmax.value).toFixed(1); };
-vmax.oninput = wmax.oninput = showMax; showMax();
-const joy = { v: 0, w: 0 }, padDrive = { v: 0, w: 0 };   // ジョイスティックとゲームパッドの倒し量（-1..1）
-const clamp1 = (x) => Math.max(-1, Math.min(1, x));
+const showMax = () => { $("vmaxO").textContent = (+$("vmax").value).toFixed(2) + " m/s"; $("wmaxO").textContent = (+$("wmax").value).toFixed(1) + " rad/s"; };
+$("vmax").oninput = $("wmax").oninput = showMax; showMax();
 function twist() {
-  const v = clamp1((held.has("w") ? 1 : 0) - (held.has("s") ? 1 : 0) + joy.v + padDrive.v);
-  const w = clamp1((held.has("a") ? 1 : 0) - (held.has("d") ? 1 : 0) + joy.w + padDrive.w);
-  return { linear: { x: v * +vmax.value, y: 0, z: 0 }, angular: { x: 0, y: 0, z: w * +wmax.value } };
+  const v = clamp1((held.has("w") ? 1 : 0) - (held.has("s") ? 1 : 0) + padDrive.v);
+  const w = clamp1((held.has("a") ? 1 : 0) - (held.has("d") ? 1 : 0) + padDrive.w);
+  return { linear: { x: v * +$("vmax").value, y: 0, z: 0 }, angular: { x: 0, y: 0, z: w * +$("wmax").value } };
 }
-const driving = () => held.size > 0 || Math.hypot(joy.v, joy.w) > 0.03 || Math.hypot(padDrive.v, padDrive.w) > 0.03;
-function sendStop() { held.clear(); refreshPad(); releaseStick(); padDrive.v = padDrive.w = 0; for (let i = 0; i < 3; i++) cmdVel.publish(twist()); }
+const driving = () => held.size > 0 || Math.hypot(padDrive.v, padDrive.w) > 0.03;
+const refreshPad = () => document.querySelectorAll(".pad button").forEach(b => b.classList.toggle("held", held.has(b.dataset.k)));
+function sendStop() { held.clear(); refreshPad(); padDrive.v = padDrive.w = 0; for (let i = 0; i < 3; i++) cmdVel.publish(twist()); }
 let lastMoving = false;
 setInterval(() => {
-  const moving = driving();
-  if (moving !== lastMoving) log(moving ? "DRIVE ENGAGED" : "DRIVE RELEASED");
-  if (moving || lastMoving) cmdVel.publish(twist());
-  lastMoving = moving;
+  const m = driving();
+  if (m !== lastMoving) log(m ? "走行 開始" : "走行 停止");
+  if (m || lastMoving) cmdVel.publish(twist());
+  lastMoving = m;
 }, 100);
-function refreshPad() { document.querySelectorAll(".pad button").forEach(b => b.classList.toggle("held", held.has(b.dataset.k))); }
 document.querySelectorAll(".pad button").forEach(b => {
-  const k = b.dataset.k;
-  b.addEventListener("contextmenu", e => e.preventDefault());   // スマホの長押しメニューで指が外れないように
+  const k = b.dataset.k, up = () => { held.delete(k); refreshPad(); };
+  b.addEventListener("contextmenu", e => e.preventDefault());
   b.addEventListener("pointerdown", e => { b.setPointerCapture(e.pointerId); held.add(k); refreshPad(); });
-  const up = () => { held.delete(k); refreshPad(); };
-  b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up); b.addEventListener("lostpointercapture", up);
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach(t => b.addEventListener(t, up));
 });
 addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT" && e.target.type !== "range") return;
   const k = e.key.toLowerCase();
   if (k === " " || k === "escape") { e.preventDefault(); estop(); return; }
   if (keyMap[k]) { e.preventDefault(); held.add(keyMap[k]); refreshPad(); }
-  if (SPEED_KEYS[k]) setSpeed(SPEED_KEYS[k]);
-  if (k === "?") help.open ? help.close() : help.showModal();
 });
-
-// ジョイスティック: 中心からの倒し量がそのまま速さになる（上 = 前進、左 = 左旋回）
-const stick = document.getElementById("stick"), knob = document.getElementById("knob");
-function moveStick(e) {
-  const r = stick.getBoundingClientRect(), R = r.width / 2 - 20;
-  let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
-  const d = Math.hypot(dx, dy); if (d > R) { dx *= R / d; dy *= R / d; }
-  knob.style.transform = `translate(${dx}px, ${dy}px)`;
-  const dead = (x) => Math.abs(x) < 0.08 ? 0 : x;
-  joy.v = dead(-dy / R); joy.w = dead(-dx / R);
-}
-function releaseStick() { joy.v = joy.w = 0; knob.style.transform = ""; stick.classList.remove("active"); }
-stick.addEventListener("pointerdown", e => { try { stick.setPointerCapture(e.pointerId); } catch {} stick.classList.add("active"); moveStick(e); });
-stick.addEventListener("pointermove", e => { if (stick.classList.contains("active")) moveStick(e); });
-["pointerup", "pointercancel", "lostpointercapture"].forEach(t => stick.addEventListener(t, releaseStick));
-stick.addEventListener("contextmenu", e => e.preventDefault());
-
-// 速度の段階
-const SPEEDS = { slow: [0.05, 0.4], normal: [0.12, 0.8], fast: [0.22, 1.5] };
-const SPEED_KEYS = { 1: "slow", 2: "normal", 3: "fast" };
-function setSpeed(name) {
-  [vmax.value, wmax.value] = SPEEDS[name]; showMax();
-  document.querySelectorAll("#speedPresets button").forEach(b => b.classList.toggle("on", b.dataset.speed === name));
-  try { localStorage.setItem("tb3-speed", name); } catch {}
-}
-document.querySelectorAll("#speedPresets button").forEach(b => b.onclick = () => setSpeed(b.dataset.speed));
-vmax.addEventListener("input", () => document.querySelectorAll("#speedPresets button").forEach(b => b.classList.remove("on")));
-try { setSpeed(localStorage.getItem("tb3-speed") || "normal"); } catch { setSpeed("normal"); }
-
-// ---- Orbit（PC の ROS ノードが円を描かせ続ける）----
-let orbitDir = "left", orbitPreviewUntil = 0, orbitState = null;
-const showOrbit = () => { cRO.textContent = (+cR.value * 100).toFixed(0) + "cm"; cVO.textContent = (+cV.value * 100).toFixed(0) + "cm/s"; orbitPreviewUntil = performance.now() + 4000; };
-cR.oninput = cV.oninput = showOrbit; showOrbit(); orbitPreviewUntil = 0;
-document.querySelectorAll("[data-cdir]").forEach(b => b.onclick = () => {
-  orbitDir = b.dataset.cdir; orbitPreviewUntil = performance.now() + 4000;
-  document.querySelectorAll("[data-cdir]").forEach(x => x.classList.toggle("on", x === b));
-});
-async function orbitApi(body) {
-  try {
-    const r = await fetch("/api/circle", { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
-    const j = await r.json(); return { ok: r.ok, status: r.status, j };
-  } catch { return { ok: false, status: 0, j: { error: "サーバーに届きません" } }; }
-}
-async function orbitStop(reason) { const r = await orbitApi({ action: "stop" }); if (r.ok) { orbitState = r.j; if (reason) log(reason, true); } }
-const foldedNow = () => haveJoints() && nowQ().every((v, i) => Math.abs(v - HOME[i]) < 0.2);
-cStart.onclick = async () => {
-  if (orbitState?.running) return;
-  cStart.disabled = true;
-  try {
-    if (cFold.checked && !foldedNow()) {
-      log("ORBIT · 先にアームを折りたたみます");
-      if (!(await moveArmChecked(HOME, 3, "FOLD"))) { log("ORBIT · アームを折りたためないので始めません", true); return; }
-      await sleep(3800);
-    }
-    const r = await orbitApi({ action: "start", radius: +cR.value, speed: +cV.value, dir: orbitDir });
-    if (!r.ok) { log("ORBIT · 始められません: " + (r.j.error || r.status), true); return; }
-    orbitState = r.j; log(`ORBIT START · 半径 ${(+cR.value * 100).toFixed(0)} cm・${(+cV.value * 100).toFixed(0)} cm/s・${orbitDir === "left" ? "左" : "右"}回り`);
-  } finally { cStart.disabled = false; }
-};
-cStop.onclick = async () => { const r = await orbitApi({ action: "stop", what: "orbit" }); if (r.ok) { orbitState = r.j; log("ORBIT STOP"); } };
-
-// ---- Dance（PC が 4 関節の位置と速度を出し続け、グリッパーを一定間隔で開閉する）----
-const showDance = () => { dSO.textContent = (+dS.value).toFixed(2); dGO.textContent = (+dG.value).toFixed(1) + "s"; };
-dS.oninput = dG.oninput = showDance; showDance();
-async function danceApi(body) {
-  try {
-    const r = await fetch("/api/dance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    return { ok: r.ok, status: r.status, j: await r.json() };
-  } catch { return { ok: false, status: 0, j: { error: "サーバーに届きません" } }; }
-}
-async function startDancePc() {
-  if (!dArm.checked && !dGrip.checked) { log("DANCE · 4 Joints か Gripper を選んでください", true); return false; }
-  const r = await danceApi({ arm: dArm.checked, gripper: dGrip.checked, scale: +dS.value, grip_period: +dG.value });
-  if (!r.ok) { log("DANCE · 始められません: " + (r.j.error || r.status), true); return false; }
-  orbitState = r.j;
-  log(`DANCE START · ${dArm.checked ? "4 関節" : ""}${dArm.checked && dGrip.checked ? " + " : ""}${dGrip.checked ? "グリッパー" : ""}` + (r.j.scale_used != null ? `・大きさ ${r.j.scale_used}` + (r.j.scale_used < +dS.value - 0.01 ? "（当たらないよう縮めました）" : "") : ""));
-  return true;
-}
-dStart.onclick = async () => { dStart.disabled = true; try { await startDancePc(); } finally { dStart.disabled = false; } };
-dStop.onclick = async () => { const r = await orbitApi({ action: "stop", what: "dance" }); if (r.ok) { orbitState = r.j; log("DANCE STOP"); } };
-allStart.onclick = async () => {
-  allStart.disabled = true;
-  try {
-    if (!orbitState?.arm?.running && !(await startDancePc())) return;
-    if (!orbitState?.running) cStart.click();
-  } finally { allStart.disabled = false; }
-};
-let orbitWasRunning = false;
-setInterval(async () => {
-  const r = await orbitApi(); if (!r.ok) { cStatus.className = "screen readout warn"; cStatus.textContent = "Orbit サーバーに届きません"; return; }
-  const s = orbitState = r.j;
-  if (s.running) {
-    cStatus.className = "screen readout " + (s.blocked ? "warn" : "run");
-    cStatus.textContent = (s.blocked ? "PAUSED · " + s.blocked_info : "ORBIT RUNNING") +
-      `\n周回 ${s.laps} ・ ${s.elapsed_s} s ・ 指令 ω ${s.cmd_omega} rad/s ・ 実測 ω ${s.gyro_z ?? "—"} rad/s ・ Link ${s.link_ok ? "OK" : "LOST"}`;
-  } else {
-    cStatus.className = "screen readout" + (s.stop_reason && /link|lost/i.test(s.stop_reason) ? " warn" : "");
-    cStatus.textContent = s.stop_reason ? "STOPPED · " + s.stop_reason + (s.laps ? ` ・ ${s.laps} 周` : "") : "OFF" + (s.link_ok ? " ・ Link OK" : " ・ Link ?");
-    if (orbitWasRunning && s.stop_reason) log("ORBIT STOPPED · " + s.stop_reason + ` (${s.laps} 周)`, /link/i.test(s.stop_reason));
-  }
-  orbitWasRunning = s.running;
-  const a = s.arm, g = s.gripper;
-  if (a.running || g.running) {
-    dStatus.className = "screen readout run";
-    dStatus.textContent = `DANCE RUNNING${a.running ? ` ・ 4 関節 大きさ ${a.scale} ・ 送信 ${a.sent} 回` : ""}${g.running ? ` ・ グリッパー ${g.open ? "開" : "閉"} ${g.count} 回` : ""}\n経過 ${a.running ? a.elapsed_s : "—"} s ・ Link ${s.link_ok ? "OK" : "LOST"}`;
-  } else {
-    const why = a.stop_reason || g.stop_reason;
-    dStatus.className = "screen readout" + (/link|lost/i.test(why) ? " warn" : "");
-    dStatus.textContent = why ? "STOPPED · " + why : "OFF" + (s.link_ok ? " ・ Link OK" : " ・ Link ?");
-  }
-  if (danceWas && !a.running && !g.running && (a.stop_reason || g.stop_reason)) log("DANCE STOPPED · " + (a.stop_reason || g.stop_reason), /link|lost/i.test(a.stop_reason || g.stop_reason));
-  danceWas = a.running || g.running;
-}, 500);
-let danceWas = false;
-
-// モード切替（スマホ幅で盤を絞る）と早見表
-const help = document.getElementById("help");
-helpBtn.onclick = () => help.showModal(); helpClose.onclick = () => help.close();
-function setMode(m) {
-  document.body.dataset.mode = m;
-  document.querySelectorAll("#modes button").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
-  try { localStorage.setItem("tb3-mode", m); } catch {}
-}
-document.querySelectorAll("#modes button").forEach(b => b.onclick = () => setMode(b.dataset.mode));
-let savedMode = null; try { savedMode = localStorage.getItem("tb3-mode"); } catch {}
-setMode(savedMode || "drive");
 addEventListener("keyup", e => { const k = keyMap[e.key.toLowerCase()]; if (k) { held.delete(k); refreshPad(); } });
 addEventListener("blur", sendStop);
 document.addEventListener("visibilitychange", () => { if (document.hidden) sendStop(); });
 
-// 計器は実際の速度（/odom）を指す
-new ROSLIB.Topic({ ros, name: "/odom", messageType: "nav_msgs/Odometry", throttle_rate: 100 }).subscribe(m => {
-  const v = m.twist.twist.linear.x, w = m.twist.twist.angular.z;
-  setNeedle("needleV", v, 0.22); setNeedle("needleW", -w, 1.8);
-  vNow.textContent = fmt(v); wNow.textContent = fmt(w);
-});
-
 // ---- アーム ----
 const JOINTS = ["joint1", "joint2", "joint3", "joint4"];
-const LIMITS = window.ArmKin.LIMITS;   // 実角の限界を読み値の単位に直したもの（arm_kin.js）
-// HOME = OpenManipulator-X 標準の折りたたみ姿勢 a=[0,-1.05,1.05,0]（q = a - OFFSET）。MuJoCo で自己衝突・車体との衝突がないことを確認済み。
-// 旧構成の ~/.tb3_home.json の姿勢は、今の関節の 0 位置では joint3 が限界を超えて link2 と link4 が約 23 mm めり込むので使わない
-const HOME = [0, -1.98, 0.98, 1.65], HOME_GRIP = 0.0038;
+// 関節の限界（/joint_states の値の単位）。この機体は関節の 0 位置が URDF とずれている（docs/05）
+const LIMITS = [[-2.827, 2.827], [-2.721, 0.641], [-1.012, 1.312], [-0.141, 3.142]];
+const HOME = [0, -1.98, 0.98, 1.65], HOME_GRIP = 0.0038;      // 折りたたみ姿勢（MuJoCo で衝突なしを確認済み）
 const current = {};
-const jointsEl = document.getElementById("joints");
-JOINTS.forEach((j, i) => {
-  jointsEl.insertAdjacentHTML("beforeend",
-    `<div class="row"><label class="caption">Joint ${i + 1}</label><input id="${j}" type="range" min="${LIMITS[i][0].toFixed(3)}" max="${LIMITS[i][1].toFixed(3)}" step="0.01" value="${HOME[i]}"><output id="${j}O"></output><span class="now" id="${j}N">—</span></div>`);
-});
-const showJ = () => { JOINTS.forEach(j => document.getElementById(j + "O").textContent = fmt(+document.getElementById(j).value)); gripO.textContent = (+grip.value * 1000).toFixed(1) + "mm"; };
-jointsEl.addEventListener("input", showJ); grip.oninput = showJ; showJ();
+JOINTS.forEach((j, i) => $("joints").insertAdjacentHTML("beforeend",
+  `<div class="row"><label>Joint ${i + 1}</label><input id="${j}" type="range" min="${LIMITS[i][0]}" max="${LIMITS[i][1]}" step="0.01" value="${HOME[i]}"><output id="${j}O"></output><span class="now" id="${j}N">—</span></div>`));
+const showJ = () => { JOINTS.forEach(j => $(j + "O").textContent = fmt(+$(j).value)); $("gripO").textContent = (+$("grip").value * 1000).toFixed(1) + " mm"; };
+$("joints").addEventListener("input", showJ); $("grip").oninput = showJ; showJ();
+const haveJoints = () => JOINTS.every(j => j in current);
+const nowQ = () => JOINTS.map(j => current[j]);
 
 const armTraj = new ROSLIB.Topic({ ros, name: "/arm_controller/joint_trajectory", messageType: "trajectory_msgs/JointTrajectory" });
 function moveArm(pos, sec = 2) {
   armTraj.publish({ joint_names: JOINTS, points: [{ positions: pos, velocities: [], accelerations: [], effort: [], time_from_start: { sec: Math.floor(sec), nanosec: Math.round((sec % 1) * 1e9) } }] });
-  log(`ARM → [${pos.map(fmt).join(", ")}] in ${sec}s`);
+  log(`ARM → [${pos.map(fmt).join(", ")}] ${sec}s`);
 }
-// ---- 衝突判定（サーバーの MuJoCo。workspace/ のモデル）----
 let simWarned = false;
 async function checkPoses(poses) {
   try {
@@ -725,11 +182,9 @@ async function checkPoses(poses) {
   }
 }
 const GROUP_JA = { self: "アーム同士", floor: "床", wheel: "車輪", caster: "キャスター", lidar: "LiDAR", plate_f050: "上段の板", body_f050: "車体" };
-// 今の位置から目標まで、関節を直線に動かす（コントローラの動き方）経路を 24 点で調べる。動かして大丈夫なら true
-async function pathOk(to, label = "ARM") {
+async function pathOk(to, label) {      // 今の位置から目標まで直線に動かす経路を 24 点で調べる
   const from = haveJoints() ? nowQ() : to, n = 24;
-  const poses = Array.from({ length: n + 1 }, (_, i) => from.map((v, k) => v + (to[k] - v) * i / n));
-  const res = await checkPoses(poses);
+  const res = await checkPoses(Array.from({ length: n + 1 }, (_, i) => from.map((v, k) => v + (to[k] - v) * i / n)));
   if (!res) return true;
   const bad = res.findIndex(x => !x.ok);
   if (bad < 0) return true;
@@ -737,378 +192,134 @@ async function pathOk(to, label = "ARM") {
   log(`${label} · 動かしません: 経路の ${Math.round(bad / n * 100)}% 地点で ${why}`, true);
   return false;
 }
-async function moveArmChecked(pos, sec = 2, label = "ARM") { if (await pathOk(pos, label)) { moveArm(pos, sec); return true; } return false; }
-sendArm.onclick = () => moveArmChecked(JOINTS.map(j => +document.getElementById(j).value), 2, "EXECUTE");
-homeBtn.onclick = async () => { JOINTS.forEach((j, i) => document.getElementById(j).value = HOME[i]); grip.value = HOME_GRIP; showJ(); if (await moveArmChecked(HOME, 3, "HOME")) sendGrip(HOME_GRIP); };
-syncBtn.onclick = () => { JOINTS.forEach(j => { if (j in current) document.getElementById(j).value = current[j]; }); if ("gripper_left_joint" in current) grip.value = current.gripper_left_joint; showJ(); log("POSITION READ"); };
-
-// roslib 1.4.1 は ROS 2 アクション未対応なので rosbridge の send_action_goal を直接送る
+async function moveArmChecked(pos, sec, label) { if (await pathOk(pos, label)) { moveArm(pos, sec); return true; } return false; }
 let gripSeq = 0;
-function sendGrip(p) {
+function sendGrip(p) {      // roslib 1.4.1 は ROS 2 アクション未対応なので、rosbridge の send_action_goal を直接送る
   ros.callOnConnection({ op: "send_action_goal", id: `grip_${++gripSeq}`, action: "/gripper_controller/gripper_cmd",
     action_type: "control_msgs/action/GripperCommand", args: { command: { position: p, max_effort: -1.0 } }, feedback: false });
   log(`GRIPPER → ${(p * 1000).toFixed(1)} mm`);
 }
-gripSend.onclick = () => sendGrip(+grip.value);
-gripOpen.onclick = () => { grip.value = 0.019; showJ(); sendGrip(0.019); };
-gripClose.onclick = () => { grip.value = -0.010; showJ(); sendGrip(-0.010); };
-
+$("sendArm").onclick = () => moveArmChecked(JOINTS.map(j => +$(j).value), 2, "EXECUTE");
+$("homeBtn").onclick = async () => { JOINTS.forEach((j, i) => $(j).value = HOME[i]); $("grip").value = HOME_GRIP; showJ(); if (await moveArmChecked(HOME, 3, "HOME")) sendGrip(HOME_GRIP); };
+$("syncBtn").onclick = () => { JOINTS.forEach(j => { if (j in current) $(j).value = current[j]; }); if ("gripper_left_joint" in current) $("grip").value = current.gripper_left_joint; showJ(); log("現在位置を読み込み"); };
+$("gripSend").onclick = () => sendGrip(+$("grip").value);
+$("gripOpen").onclick = () => { $("grip").value = 0.019; showJ(); sendGrip(0.019); };
+$("gripClose").onclick = () => { $("grip").value = -0.010; showJ(); sendGrip(-0.010); };
 new ROSLIB.Topic({ ros, name: "/joint_states", messageType: "sensor_msgs/JointState", throttle_rate: 200 }).subscribe(m => {
   m.name.forEach((n, i) => current[n] = m.position[i]);
-  JOINTS.forEach(j => { if (j in current) document.getElementById(j + "N").textContent = fmt(current[j]); });
+  JOINTS.forEach(j => { if (j in current) $(j + "N").textContent = fmt(current[j]); });
 });
 
-// ---- 非常停止: 走行を止め、アームはその場で保持 ----
-function estop() {
-  sendStop();
-  stopArmMotion();
-  orbitApi({ action: "stop" });
-  if (JOINTS.every(j => j in current)) moveArm(shownJoints(), 0.3);   // コントローラが今出している指令位置でなめらかに止める（測った位置は 0.2 秒遅れているので使わない）
-  log("EMERGENCY STOP", true);
+// ---- Orbit / Dance（PC の ROS ノードが指令を出し続ける）----
+let state = null, orbitWas = false, danceWas = false;
+async function api(path, body) {
+  try {
+    const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+    return { ok: r.ok, status: r.status, j: await r.json() };
+  } catch { return { ok: false, status: 0, j: { error: "サーバーに届きません" } }; }
 }
-document.getElementById("estop").onclick = estop;
+const orbitApi = (body) => api("/api/circle", body), danceApi = (body) => api("/api/dance", body);
+const showOrbit = () => { $("cRO").textContent = (+$("cR").value * 100).toFixed(0) + " cm"; $("cVO").textContent = (+$("cV").value * 100).toFixed(0) + " cm/s"; };
+const showDance = () => { $("dSO").textContent = (+$("dS").value).toFixed(2); $("dGO").textContent = (+$("dG").value).toFixed(1) + " s"; };
+$("cR").oninput = $("cV").oninput = showOrbit; $("dS").oninput = $("dG").oninput = showDance; showOrbit(); showDance();
+const orbitDir = () => document.querySelector('input[name="cdir"]:checked').value;
+const foldedNow = () => haveJoints() && nowQ().every((v, i) => Math.abs(v - HOME[i]) < 0.2);
 
-// ---- アーム工房 ----
-const K = window.ArmKin;
-const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-const zmin = document.getElementById("zmin"), jogv = document.getElementById("jogv");
-const showWs = () => { zminO.textContent = (+zmin.value * 100).toFixed(0) + "cm"; jogvO.textContent = (+jogv.value * 100).toFixed(1) + "cm/s"; };
-zmin.oninput = jogv.oninput = showWs; showWs();
-const haveJoints = () => JOINTS.every(j => j in current);
-const nowQ = () => JOINTS.map(j => current[j]);
-const setSliders = (q, g) => { JOINTS.forEach((j, i) => document.getElementById(j).value = q[i]); if (g !== undefined) grip.value = g; showJ(); };
-
-// 手先の直接操作: 押している間、目標の手先位置を少しずつ動かし、逆運動学で関節角に直して送り続ける
-const jogHeld = new Set();
-let jogTarget = null, jogBlocked = false, targetQ = null;
-const JOG_KEYS = { i:"r+", k:"r-", r:"z+", f:"z-", g:"p+", t:"p-", j:"y+", l:"y-" };
-function refreshJog() { document.querySelectorAll(".jog button").forEach(b => b.classList.toggle("held", jogHeld.has(b.dataset.j))); }
-let lastJogQ = null, lastJogT = 0, jogHit = null, lookBusy = false, lookN = 0;
-// 先 0.4 秒の姿勢を 100 ms ごとにサーバーで調べる（答えを待たずに進め、当たるとわかった時点で止める）
-async function lookAhead(q) {
-  if (lookBusy || ++lookN % 2) return;
-  lookBusy = true;
-  const res = await checkPoses([q]); lookBusy = false;
-  if (res && !res[0].ok && jogTarget) jogHit = res[0];
-}
-// 手先操作の指令は、先 0.2 秒・0.4 秒の位置を今の速度で延長した 2 点にして、関節の速度も付ける。
-// コントローラは新しい指令のたびに今の位置と速度から滑らかにつなぐので、動きが 1 歩ずつ区切れない
-function streamArm(q) {
-  const now = performance.now();
-  const dtS = (now - lastJogT) / 1000;
-  const qd = lastJogQ && dtS > 0.01 && dtS < 0.4 ? q.map((v, i) => (v - lastJogQ[i]) / dtS) : [0, 0, 0, 0];
-  const ext = (h) => q.map((v, i) => Math.min(K.LIMITS[i][1], Math.max(K.LIMITS[i][0], v + qd[i] * h)));
-  const pt = (h) => ({ positions: ext(h), velocities: qd, accelerations: [], effort: [], time_from_start: { sec: 0, nanosec: Math.round(h * 1e9) } });
-  lookAhead(ext(0.4));
-  armTraj.publish({ joint_names: JOINTS, points: [pt(0.2), pt(0.4)] });
-  lastJogQ = q; lastJogT = now;
-}
-const jogAnalog = { r: 0, z: 0, p: 0, y: 0 };   // ゲームパッドからの倒し量（-1..1）
-setInterval(() => {
-  const analog = Object.values(jogAnalog).some(v => Math.abs(v) > 0.05);
-  if (jogHit && (jogHeld.size || analog)) {
-    const x = jogHit; jogHit = null;
-    if (lastJogQ) armTraj.publish({ joint_names: JOINTS, points: [{ positions: lastJogQ, velocities: [0, 0, 0, 0], accelerations: [], effort: [], time_from_start: { sec: 0, nanosec: 200000000 } }] });
-    jogTarget = null; lastJogQ = null; jogHeld.clear(); refreshJog();
-    log("TIP LIMIT · " + (x.limit.length ? `関節${x.limit.join("・")}が限界` : x.hit.map(g => GROUP_JA[g] || g).join("・") + " に当たるので止めました"), true);
-    return;
-  }
-  if (!jogHeld.size && !analog) {
-    jogHit = null;
-    if (jogTarget) {
-      jogTarget = null; log("TIP JOG RELEASED");
-      if (lastJogQ) armTraj.publish({ joint_names: JOINTS, points: [{ positions: lastJogQ, velocities: [0, 0, 0, 0], accelerations: [], effort: [], time_from_start: { sec: 0, nanosec: 200000000 } }] });
-      lastJogQ = null;
+$("cStart").onclick = async () => {
+  if (state?.running) return;
+  $("cStart").disabled = true;
+  try {
+    if ($("cFold").checked && !foldedNow()) {
+      log("ORBIT · 先に腕をたたみます");
+      if (!(await moveArmChecked(HOME, 3, "FOLD"))) { log("ORBIT · 腕をたためないので始めません", true); return; }
+      await sleep(3800);
     }
-    return;
-  }
-  if (!haveJoints()) return;
-  if (!jogTarget) { jogTarget = K.fk(nowQ()); jogBlocked = false; log("TIP JOG ENGAGED"); }
-  const dt = 0.05, v = +jogv.value, w = v * 8;           // 角度は 1 cm/s あたり 0.08 rad/s
-  const c = { ...jogTarget };
-  for (const j of jogHeld) {
-    const s = j[1] === "+" ? 1 : -1;
-    if (j[0] === "r") c.r += s * v * dt;
-    if (j[0] === "z") c.z += s * v * dt;
-    if (j[0] === "p") c.pitch += s * w * dt;
-    if (j[0] === "y") c.yaw += s * w * dt;
-  }
-  c.r += jogAnalog.r * v * dt; c.z += jogAnalog.z * v * dt; c.pitch += jogAnalog.p * w * dt; c.yaw += jogAnalog.y * w * dt;
-  const q = c.z >= +zmin.value && c.r >= 0.06 ? K.ik(c) : null;
-  if (!q) { if (!jogBlocked) log("TIP LIMIT · これ以上は動けません", true); jogBlocked = true; return; }
-  jogBlocked = false; jogTarget = c; targetQ = q;
-  streamArm(q);
-  setSliders(q);
-}, 50);
-document.querySelectorAll(".jog button").forEach(b => {
-  const j = b.dataset.j;
-  b.addEventListener("contextmenu", e => e.preventDefault());
-  b.addEventListener("pointerdown", e => { b.setPointerCapture(e.pointerId); jogHeld.add(j); refreshJog(); });
-  const up = () => { jogHeld.delete(j); refreshJog(); };
-  b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up); b.addEventListener("lostpointercapture", up);
-});
-addEventListener("keydown", e => {
-  if (e.target.tagName === "INPUT" && e.target.type === "text") return;
-  const j = JOG_KEYS[e.key.toLowerCase()];
-  if (j) { e.preventDefault(); jogHeld.add(j); refreshJog(); }
-});
-addEventListener("keyup", e => { const j = JOG_KEYS[e.key.toLowerCase()]; if (j) { jogHeld.delete(j); refreshJog(); } });
-addEventListener("blur", () => { jogHeld.clear(); refreshJog(); });
-
-// 側面図
-const sv = document.getElementById("side"), sx = sv.getContext("2d");
-const MOUNT_Z = -0.0765;   // joint2 から見たアーム台座の高さ（robot_description の link1）
-function drawSide(keepBackground) {
-  const W = sv.width, H = sv.height, S = 900, ox = 170, oz = 250;
-  const P = (r, z) => [ox + r * S, oz - z * S];
-  if (!keepBackground) sx.clearRect(0, 0, W, H);
-  sx.strokeStyle = "rgba(61,255,242,.12)"; sx.lineWidth = 1;
-  for (let r = -0.1; r <= 0.45; r += 0.05) { const [x] = P(r, 0); sx.beginPath(); sx.moveTo(x, 0); sx.lineTo(x, H); sx.stroke(); }
-  for (let z = -0.25; z <= 0.3; z += 0.05) { const [, y] = P(0, z); sx.beginPath(); sx.moveTo(0, y); sx.lineTo(W, y); sx.stroke(); }
-  sx.strokeStyle = "rgba(61,255,242,.25)"; sx.setLineDash([4, 6]);
-  sx.beginPath(); sx.arc(ox, oz, (K.L.L1 + K.L.L2 + K.L.L3) * S, 0, 2 * Math.PI); sx.stroke(); sx.setLineDash([]);
-  // 台座と床ガード
-  const [, my] = P(0, MOUNT_Z); sx.fillStyle = "rgba(123,147,146,.35)"; sx.fillRect(0, my, ox + 40, 10);
-  const [, gy] = P(0, +zmin.value); sx.strokeStyle = "#c8102e"; sx.lineWidth = 2; sx.setLineDash([10, 6]);
-  sx.beginPath(); sx.moveTo(0, gy); sx.lineTo(W, gy); sx.stroke(); sx.setLineDash([]);
-  sx.fillStyle = "rgba(255,59,78,.8)"; sx.font = "14px monospace"; sx.fillText("FLOOR GUARD", W - 120, gy - 6);
-  const drawArm = (q, color, dash) => {
-    const f = K.fk(q); sx.strokeStyle = color; sx.lineWidth = dash ? 3 : 7; sx.lineCap = "round"; sx.setLineDash(dash ? [8, 6] : []);
-    sx.beginPath(); f.pts.forEach((p, i) => { const [x, y] = P(p[0], p[1]); i ? sx.lineTo(x, y) : sx.moveTo(x, y); }); sx.stroke(); sx.setLineDash([]);
-    if (!dash) { sx.fillStyle = "#c5e7e8"; f.pts.forEach(p => { const [x, y] = P(p[0], p[1]); sx.beginPath(); sx.arc(x, y, 6, 0, 2 * Math.PI); sx.fill(); }); }
-    return f;
-  };
-  if (targetQ) drawArm(targetQ, "rgba(255,59,78,.85)", true);
-  if (haveJoints()) {
-    sx.shadowColor = "#3dfff2"; sx.shadowBlur = 10;
-    const f = drawArm(shownJoints(), "#3dfff2", false);
-    sx.shadowBlur = 0;
-    tipR.textContent = (f.r * 100).toFixed(1) + "cm"; tipZ.textContent = (f.z * 100).toFixed(1) + "cm";
-    tipP.textContent = (f.pitch * 180 / Math.PI).toFixed(0) + "°"; tipY.textContent = (f.yaw * 180 / Math.PI).toFixed(0) + "°";
-  }
-}
-(function frame() { drawSide(); requestAnimationFrame(frame); })();   // 毎フレーム描く（drawSide は後で印を描く版に差し替えるので名前で呼ぶ）
-// 側面図は、状態の読み取り（約 10 回/秒）ではなく、コントローラが出している今の指令位置（滑らか）で描く
-let refQ = null, refT = 0;
-new ROSLIB.Topic({ ros, name: "/arm_controller/controller_state", messageType: "control_msgs/JointTrajectoryControllerState", throttle_rate: 40, queue_length: 1 }).subscribe(m => {
-  const q = JOINTS.map(j => m.reference.positions[m.joint_names.indexOf(j)]);
-  if (q.every(Number.isFinite)) { refQ = q; refT = performance.now(); }
-});
-const shownJoints = () => (refQ && performance.now() - refT < 600 ? refQ : nowQ());
-const _moveArm = moveArm;
-moveArm = (pos, sec) => { targetQ = pos.slice(); _moveArm(pos, sec); };
-
-// 姿勢と動作列（サーバーの TB3_DATA_DIR/poses.json に保存。どのブラウザからも同じものが見える）
-let lib = { poses: {}, sequences: {} }, seq = [], playing = null;
-async function loadLib() {
-  try { lib = await (await fetch("/api/library", { cache: "no-store" })).json(); renderLib(); }
-  catch { log("POSE LIBRARY を読めません", true); }
-}
-async function saveLib() {
-  const r = await fetch("/api/library", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(lib) }).catch(() => null);
-  if (!r || !r.ok) log("POSE LIBRARY の保存に失敗", true);
-}
-function renderLib() {
-  const names = Object.keys(lib.poses);
-  poseList.innerHTML = names.length ? names.map(n => `<li><span class="nm">${esc(n)}</span><button data-go="${esc(n)}">Go</button><button data-add="${esc(n)}">+Seq</button><button data-del="${esc(n)}">✕</button></li>`).join("")
-    : `<li class="empty">まだありません。アームを動かして「Save Pose」</li>`;
-  seqList.innerHTML = seq.length ? seq.map((s, i) => `<li data-i="${i}"><span class="nm">${i + 1}. ${esc(s.pose)}${lib.poses[s.pose] ? "" : " (なし)"}</span><input type="number" min="0.5" max="10" step="0.5" value="${s.sec}" data-sec="${i}" title="移動にかける秒数">s<button data-rm="${i}">✕</button></li>`).join("")
-    : `<li class="empty">姿勢の「+Seq」で並べます</li>`;
-}
-poseSave.onclick = async () => {
-  const name = poseName.value.trim();
-  if (!name) { log("姿勢の名前を入れてください", true); return; }
-  if (!haveJoints()) { log("アームの現在値がまだ届いていません", true); return; }
-  lib.poses[name] = { joints: nowQ().map(v => +v.toFixed(4)), gripper: +(current.gripper_left_joint ?? +grip.value).toFixed(4) };
-  poseName.value = ""; renderLib(); await saveLib(); log(`POSE SAVED · ${esc(name)}`);
+    const r = await orbitApi({ action: "start", radius: +$("cR").value, speed: +$("cV").value, dir: orbitDir() });
+    if (!r.ok) { log("ORBIT · 始められません: " + (r.j.error || r.status), true); return; }
+    state = r.j; log(`ORBIT 開始 · 半径 ${(+$("cR").value * 100).toFixed(0)} cm・${(+$("cV").value * 100).toFixed(0)} cm/s・${orbitDir() === "left" ? "左" : "右"}回り`);
+  } finally { $("cStart").disabled = false; }
 };
-poseList.onclick = async (e) => {
-  const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.go) { const p = lib.poses[b.dataset.go]; setSliders(p.joints, p.gripper); if (await moveArmChecked(p.joints, 2, "GO")) sendGrip(p.gripper); }
-  if (b.dataset.add) { seq.push({ pose: b.dataset.add, sec: 2 }); renderLib(); }
-  if (b.dataset.del && confirm(`姿勢「${b.dataset.del}」を消しますか？`)) { delete lib.poses[b.dataset.del]; renderLib(); await saveLib(); }
-};
-seqList.onclick = (e) => { const b = e.target.closest("button[data-rm]"); if (b) { seq.splice(+b.dataset.rm, 1); renderLib(); } };
-seqList.onchange = (e) => { const i = e.target.dataset.sec; if (i !== undefined) seq[+i].sec = Math.min(10, Math.max(0.5, +e.target.value || 2)); };
-seqSave.onclick = async () => {
-  const name = seqName.value.trim();
-  if (!name || !seq.length) { log("動作列の名前と中身が要ります", true); return; }
-  lib.sequences[name] = seq.map(s => ({ ...s })); await saveLib(); log(`SEQUENCE SAVED · ${esc(name)} (${seq.length} steps)`);
-};
-seqLoad.onclick = () => {
-  const name = seqName.value.trim(), s = lib.sequences[name];
-  if (!s) { log(`動作列「${esc(name)}」はありません。保存済み: ${Object.keys(lib.sequences).map(esc).join(", ") || "なし"}`, true); return; }
-  seq = s.map(x => ({ ...x })); renderLib(); log(`SEQUENCE LOADED · ${esc(name)}`);
-};
-seqPlay.onclick = async () => {
-  if (playing || !seq.length) return;
-  const token = playing = {};
-  log(`SEQUENCE START · ${seq.length} steps${seqLoop.checked ? " · loop" : ""}`);
-  do {
-    for (let i = 0; i < seq.length && playing === token; i++) {
-      const p = lib.poses[seq[i].pose];
-      if (!p) { log(`姿勢「${esc(seq[i].pose)}」がないので飛ばします`, true); continue; }
-      seqList.querySelectorAll("li").forEach((li, k) => li.classList.toggle("now", k === i));
-      if (!(await moveArmChecked(p.joints, seq[i].sec, `STEP ${i + 1}`))) { playing = null; log("SEQUENCE STOPPED · 衝突のおそれ", true); break; }
-      sendGrip(p.gripper);
-      for (let t = 0; t < seq[i].sec * 1000 + 400 && playing === token; t += 100) await sleep(100);
-    }
-  } while (seqLoop.checked && playing === token);
-  if (playing === token) { playing = null; log("SEQUENCE DONE"); }
-  seqList.querySelectorAll("li").forEach(li => li.classList.remove("now"));
-};
-seqStop.onclick = () => stopArmMotion();
-
-// ---- ワンタップ姿勢 ----
-const READY_Q = [0, -0.93, -0.07, 1.65];   // 上腕が真上・前腕と手先が水平（arm_kin.js の OFFSET を実測した姿勢）
-// 関節の動く量に合わせて移動時間を決める（速すぎないよう 0.8 rad/s 以下、1.2〜4 秒）
-async function goJoints(q, label) {
-  const from = haveJoints() ? nowQ() : q;
-  const sec = Math.min(4, Math.max(1.2, Math.max(...q.map((v, i) => Math.abs(v - from[i]))) / 0.8));
-  if (!(await pathOk(q, label || "ARM"))) return false;
-  setSliders(q); moveArm(q, +sec.toFixed(1)); if (label) log(`${label} · ${sec.toFixed(1)}s`);
+$("cStop").onclick = async () => { const r = await orbitApi({ action: "stop", what: "orbit" }); if (r.ok) { state = r.j; log("ORBIT 停止"); } };
+async function startDance() {
+  if (!$("dArm").checked && !$("dGrip").checked) { log("DANCE · 4 関節かグリッパーを選んでください", true); return false; }
+  const r = await danceApi({ arm: $("dArm").checked, gripper: $("dGrip").checked, scale: +$("dS").value, grip_period: +$("dG").value });
+  if (!r.ok) { log("DANCE · 始められません: " + (r.j.error || r.status), true); return false; }
+  state = r.j;
+  log("DANCE 開始" + (r.j.scale_used != null ? ` · 大きさ ${r.j.scale_used}` + (r.j.scale_used < +$("dS").value - 0.01 ? "（当たらないよう縮めました）" : "") : ""));
   return true;
 }
-// 手先の位置だけ決めて、届く傾きを今の傾きに近い順に探す
-function goTip(t, label, pitches) {
-  const cur = haveJoints() ? K.fk(nowQ()) : { pitch: 0, yaw: 0 };
-  const yaw = t.yaw ?? cur.yaw;
-  const list = pitches || Array.from({ length: 63 }, (_, i) => cur.pitch + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.05);
-  for (const p of list) {
-    if (t.z < +zmin.value || t.r < 0.06) break;
-    if (!reachable(t.r, t.z, p)) continue;          // MuJoCo の全探索で、車体や自分に当たらず届く傾きだけ
-    const q = K.ik({ r: t.r, z: t.z, pitch: p, yaw });
-    if (q) return goJoints(q, label);
-  }
-  log(`${label || "TIP"} · そこには届きません（関節の限界・床・車体・自分に当たる）`, true); return false;
-}
-const QUICK = {
-  ready: () => goJoints(READY_Q, "READY"),
-  home: () => { const p = lib.poses.home || { joints: HOME, gripper: HOME_GRIP }; goJoints(p.joints, "HOME"); },
-  reach: () => goTip({ r: 0.28, z: 0.06 }, "REACH", [0, 0.1, -0.1, 0.2, 0.3]),
-  pick: () => goTip({ r: 0.20, z: Math.max(+zmin.value + 0.02, -0.10) }, "PICK LOW", [1.4, 1.5, 1.3, 1.2, 1.0, 0.8]),
+$("dStart").onclick = async () => { $("dStart").disabled = true; try { await startDance(); } finally { $("dStart").disabled = false; } };
+$("dStop").onclick = async () => { const r = await orbitApi({ action: "stop", what: "dance" }); if (r.ok) { state = r.j; log("DANCE 停止"); } };
+$("allStart").onclick = async () => {
+  $("allStart").disabled = true;
+  try { if (!state?.arm?.running && !(await startDance())) return; if (!state?.running) $("cStart").click(); }
+  finally { $("allStart").disabled = false; }
 };
-document.querySelectorAll("[data-quick]").forEach(b => b.onclick = () => QUICK[b.dataset.quick]());
-
-// グリッパーは今の開き具合を見て開閉を切り替える
-const gripOpenNow = () => (current.gripper_left_joint ?? 0) > 0.008;
-function toggleGrip() { const open = !gripOpenNow(); grip.value = open ? 0.019 : -0.010; showJ(); sendGrip(+grip.value); }
-gripToggle.onclick = toggleGrip;
-setInterval(() => {
-  if (!("gripper_left_joint" in current)) return;
-  const open = gripOpenNow();
-  gripState.textContent = open ? "Open" : "Closed"; gripToggle.classList.toggle("open", open);
-}, 200);
-addEventListener("keydown", e => {
-  if (e.target.tagName === "INPUT" && e.target.type === "text") return;
-  const k = e.key.toLowerCase();
-  if (e.repeat) return;
-  if (k === "y") QUICK.ready(); if (k === "h") QUICK.home(); if (k === "o") toggleGrip();
-});
-
-// 側面図をタップした位置へ手先を動かす
-let clickMark = null;
-sv.addEventListener("pointerdown", e => {
-  const b = sv.getBoundingClientRect();
-  const x = (e.clientX - b.left) * sv.width / b.width, y = (e.clientY - b.top) * sv.height / b.height;
-  const r = (x - 170) / 900, z = (250 - y) / 900;   // drawSide の原点と縮尺に合わせる
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-  clickMark = [x, y];
-  if (z < +zmin.value) { log("床ガードより下は選べません", true); return; }
-  goTip({ r, z }, `TIP → ${(r * 100).toFixed(0)}cm / ${(z * 100).toFixed(0)}cm`);
-});
-// MuJoCo の全探索で出した到達領域（URDF の限界・写真から測った車体・床との衝突を除く）。reach.json は workspace/export_reach.py で作る
-let reachTab = null, reachCache = { k: null, canvas: null };
-fetch("reach.json").then(r => r.json()).then(j => { reachTab = { ...j, arr: Uint8Array.from(atob(j.bits), c => c.charCodeAt(0)) }; }).catch(() => log("到達領域のデータを読めません", true));
-const reachBin = (pitchRad) => { const t = reachTab, deg = ((pitchRad * 180 / Math.PI + 180) % 360 + 360) % 360 - 180; return Math.min(t.np - 1, Math.max(0, Math.round((deg - t.pitch0) / t.dpitch))); };
-function reachable(r, z, pitchRad) {
-  const t = reachTab; if (!t) return true;
-  const ir = Math.round((r - t.r0) / t.dr), iz = Math.round((z - t.z0) / t.dz);
-  if (ir < 0 || iz < 0 || ir >= t.nr || iz >= t.nz) return false;
-  const bit = (ir * t.nz + iz) * t.np + reachBin(pitchRad);
-  return ((t.arr[bit >> 3] >> (7 - (bit & 7))) & 1) === 1;
-}
-function reachLayer(pitchRad) {
-  const t = reachTab; if (!t) return null;
-  const k = reachBin(pitchRad);
-  if (reachCache.k === k) return reachCache.canvas;
-  const c = document.createElement("canvas"); c.width = sv.width; c.height = sv.height; const g = c.getContext("2d");
-  g.fillStyle = "rgba(61,255,242,.16)";
-  for (let ir = 0; ir < t.nr; ir++) for (let iz = 0; iz < t.nz; iz++) {
-    const bit = (ir * t.nz + iz) * t.np + k;
-    if ((t.arr[bit >> 3] >> (7 - (bit & 7))) & 1) g.fillRect(170 + (t.r0 + ir * t.dr - t.dr / 2) * 900, 250 - (t.z0 + iz * t.dz + t.dz / 2) * 900, t.dr * 900 + 0.5, t.dz * 900 + 0.5);
+setInterval(async () => {
+  const r = await orbitApi();
+  if (!r.ok) { $("cStatus").className = "status warn"; $("cStatus").textContent = "PC サーバーに届きません"; return; }
+  const s = state = r.j, a = s.arm, g = s.gripper;
+  if (s.running) {
+    $("cStatus").className = "status " + (s.blocked ? "warn" : "run");
+    $("cStatus").textContent = (s.blocked ? "PAUSED · " + s.blocked_info : "ORBIT RUNNING") + `\n周回 ${s.laps} ・ ${s.elapsed_s} s ・ 指令 ω ${s.cmd_omega} rad/s ・ 実測 ω ${s.gyro_z ?? "—"} rad/s ・ Link ${s.link_ok ? "OK" : "LOST"}`;
+  } else {
+    $("cStatus").className = "status" + (/link|lost/i.test(s.stop_reason || "") ? " warn" : "");
+    $("cStatus").textContent = s.stop_reason ? "STOPPED · " + s.stop_reason + (s.laps ? ` ・ ${s.laps} 周` : "") : "OFF · Link " + (s.link_ok ? "OK" : "?");
+    if (orbitWas && s.stop_reason) log("ORBIT 停止 · " + s.stop_reason + ` (${s.laps} 周)`, /link/i.test(s.stop_reason));
   }
-  reachCache = { k, canvas: c }; return c;
-}
-const _drawSide = drawSide;
-drawSide = () => {
-  if (haveJoints() && reachTab) { const lay = reachLayer(K.fk(shownJoints()).pitch); sx.clearRect(0, 0, sv.width, sv.height); if (lay) sx.drawImage(lay, 0, 0); _drawSide(true); } else _drawSide();
-  if (!clickMark) return;
-  sx.strokeStyle = "#f2c230"; sx.lineWidth = 2;
-  sx.beginPath(); sx.arc(clickMark[0], clickMark[1], 10, 0, 2 * Math.PI); sx.moveTo(clickMark[0] - 16, clickMark[1]); sx.lineTo(clickMark[0] + 16, clickMark[1]);
-  sx.moveTo(clickMark[0], clickMark[1] - 16); sx.lineTo(clickMark[0], clickMark[1] + 16); sx.stroke();
-};
+  orbitWas = s.running;
+  if (a.running || g.running) {
+    $("dStatus").className = "status run";
+    $("dStatus").textContent = `DANCE RUNNING${a.running ? ` ・ 4 関節 大きさ ${a.scale} ・ 送信 ${a.sent} 回` : ""}${g.running ? ` ・ グリッパー ${g.open ? "開" : "閉"} ${g.count} 回` : ""}\n経過 ${a.running ? a.elapsed_s : "—"} s ・ Link ${s.link_ok ? "OK" : "LOST"}`;
+  } else {
+    const why = a.stop_reason || g.stop_reason || "";
+    $("dStatus").className = "status" + (/link|lost/i.test(why) ? " warn" : "");
+    $("dStatus").textContent = why ? "STOPPED · " + why : "OFF · Link " + (s.link_ok ? "OK" : "?");
+    if (danceWas && why) log("DANCE 停止 · " + why, /link|lost/i.test(why));
+  }
+  danceWas = a.running || g.running;
+}, 500);
 
-// ---- ゲームパッド（標準配置: DualSense / Xbox）----
-const padLamp = document.getElementById("padLamp");
+// ---- 非常停止（走行を止め、Orbit / Dance を止め、腕はその場で保持）----
+function estop() {
+  sendStop();
+  orbitApi({ action: "stop" });
+  if (haveJoints()) moveArm(nowQ(), 0.3);
+  log("非常停止", true);
+}
+$("estop").onclick = estop;
+
+// ---- ゲームパッド（左スティックで走行、○ で停止）----
 let padPrev = [];
 setInterval(() => {
   const gp = [...(navigator.getGamepads?.() || [])].find(g => g && g.connected);
-  padLamp.classList.toggle("on", !!gp);
-  if (!gp) { padDrive.v = padDrive.w = 0; Object.keys(jogAnalog).forEach(k => jogAnalog[k] = 0); return; }
-  padLamp.className = "lamp on"; padLamp.querySelector("span").textContent = "Pad";
+  if (!gp) { padDrive.v = padDrive.w = 0; return; }
   const ax = (i) => { const v = gp.axes[i] || 0; return Math.abs(v) < 0.15 ? 0 : v; };
-  const bt = (i) => !!gp.buttons[i]?.pressed;
-  const edge = (i) => bt(i) && !padPrev[i];
   padDrive.v = -ax(1); padDrive.w = -ax(0);
-  jogAnalog.z = -ax(3); jogAnalog.y = -ax(2);
-  jogAnalog.r = (bt(12) ? 1 : 0) - (bt(13) ? 1 : 0);
-  jogAnalog.p = (bt(5) ? 1 : 0) - (bt(4) ? 1 : 0);
-  if (edge(1)) estop();
-  if (edge(3)) QUICK.ready();
-  if (edge(2)) QUICK.home();
-  if (edge(7)) { grip.value = 0.019; showJ(); sendGrip(0.019); }
-  if (edge(6)) { grip.value = -0.010; showJ(); sendGrip(-0.010); }
+  if (gp.buttons[1]?.pressed && !padPrev[1]) estop();
   padPrev = gp.buttons.map(b => b.pressed);
 }, 100);
-addEventListener("gamepadconnected", e => log(`GAMEPAD CONNECTED · ${esc(e.gamepad.id)}`));
-addEventListener("gamepaddisconnected", () => { log("GAMEPAD DISCONNECTED", true); padDrive.v = padDrive.w = 0; });
-function stopArmMotion() {
-  jogHeld.clear(); refreshJog();
-  if (playing) { playing = null; log("SEQUENCE STOPPED", true); }
-}
-loadLib();
 
-// ---- レーダー ----
-const cv = document.getElementById("scan"), cx = cv.getContext("2d");
+// ---- LiDAR と odom ----
+const cv = $("scan"), cx = cv.getContext("2d");
 new ROSLIB.Topic({ ros, name: "/scan", messageType: "sensor_msgs/LaserScan", throttle_rate: 200, queue_length: 1 }).subscribe(s => {
   const W = cv.width, R = 3.0, k = (W / 2) / R;
   cx.clearRect(0, 0, W, W);
-  cx.strokeStyle = "rgba(61,255,242,.22)"; cx.lineWidth = 1.5;
+  cx.strokeStyle = "#2c4046"; cx.lineWidth = 1;
   for (let r = 1; r <= R; r++) { cx.beginPath(); cx.arc(W / 2, W / 2, r * k, 0, 2 * Math.PI); cx.stroke(); }
   cx.beginPath(); cx.moveTo(W / 2, 0); cx.lineTo(W / 2, W); cx.moveTo(0, W / 2); cx.lineTo(W, W / 2); cx.stroke();
-  cx.fillStyle = "rgba(61,255,242,.5)"; cx.font = "16px monospace";
-  for (let r = 1; r <= R; r++) cx.fillText(`${r}m`, W / 2 + 6, W / 2 - r * k + 18);
-  let near = Infinity;
-  cx.fillStyle = "#3dfff2"; cx.shadowColor = "#3dfff2"; cx.shadowBlur = 8;
+  let near = Infinity; cx.fillStyle = "#3fd9c8";
   s.ranges.forEach((d, i) => {
     if (!(d > s.range_min && d < Math.min(s.range_max, R))) return;
     near = Math.min(near, d);
     const a = s.angle_min + i * s.angle_increment;
-    cx.fillRect(W / 2 - d * Math.sin(a) * k - 2.5, W / 2 - d * Math.cos(a) * k - 2.5, 5, 5);   // 上が前
+    cx.fillRect(W / 2 - d * Math.sin(a) * k - 1.5, W / 2 - d * Math.cos(a) * k - 1.5, 3, 3);   // 上が前
   });
-  cx.shadowBlur = 0;
-  if (orbitState?.running || performance.now() < orbitPreviewUntil) {
-    const rr = (orbitState?.running ? orbitState.radius : +cR.value), lf = (orbitState?.running ? orbitState.dir : orbitDir) === "left";
-    const ccx = W / 2 + (lf ? -rr : rr) * k;
-    cx.strokeStyle = orbitState?.blocked ? "rgba(255,59,78,.9)" : "rgba(242,194,48,.9)"; cx.lineWidth = 2; cx.setLineDash([10, 8]);
-    cx.beginPath(); cx.arc(ccx, W / 2, rr * k, 0, 2 * Math.PI); cx.stroke(); cx.setLineDash([]);
-  }
-  cx.fillStyle = "#c8102e"; cx.beginPath(); cx.moveTo(W / 2, W / 2 - 16); cx.lineTo(W / 2 - 10, W / 2 + 10); cx.lineTo(W / 2 + 10, W / 2 + 10); cx.fill();
-  const n = document.getElementById("nearest");
-  n.textContent = isFinite(near) ? `${near.toFixed(2)} m` : "—";
-  n.style.color = near < 0.3 ? "var(--red-hi)" : "";
+  cx.fillStyle = "#d6334a"; cx.beginPath(); cx.moveTo(W / 2, W / 2 - 10); cx.lineTo(W / 2 - 6, W / 2 + 6); cx.lineTo(W / 2 + 6, W / 2 + 6); cx.fill();
+  $("nearest").textContent = isFinite(near) ? near.toFixed(2) + " m" : "—";
+});
+new ROSLIB.Topic({ ros, name: "/odom", messageType: "nav_msgs/Odometry", throttle_rate: 200 }).subscribe(m => {
+  $("odom").textContent = `odom  v ${fmt(m.twist.twist.linear.x)} m/s   ω ${fmt(m.twist.twist.angular.z)} rad/s`;
 });
 </script>
 </body>

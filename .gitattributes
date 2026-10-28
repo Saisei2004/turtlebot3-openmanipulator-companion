@@ -15,3 +15,4 @@ tb3ctl text eol=lf
 *.stl binary
 *.png binary
 *.jpg binary
+robot/keys/id_ed25519_turtlebot text eol=lf
