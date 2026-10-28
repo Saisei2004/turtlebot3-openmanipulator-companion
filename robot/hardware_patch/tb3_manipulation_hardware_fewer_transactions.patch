@@ -1,0 +1,233 @@
+diff --git a/turtlebot3_manipulation_hardware/include/turtlebot3_manipulation_hardware/opencr.hpp b/turtlebot3_manipulation_hardware/include/turtlebot3_manipulation_hardware/opencr.hpp
+index cffb7c6..f58ca09 100644
+--- a/turtlebot3_manipulation_hardware/include/turtlebot3_manipulation_hardware/opencr.hpp
++++ b/turtlebot3_manipulation_hardware/include/turtlebot3_manipulation_hardware/opencr.hpp
+@@ -107,6 +107,9 @@ public:
+   bool set_joint_profile_velocity(const std::array<int32_t, 4> & velocity);
+ 
+   bool set_gripper_position(const double & meters);
++  // 関節 1-4 とグリッパーの目標位置と書き込みフラグを 1 回の通信（22 バイト）で書く。
++  // OpenCR は 1 回の通信に約 23 ms かかり、1 秒に 43 回しか応答できないので、通信の回数を減らすための追加。
++  bool set_goal_positions(const std::vector<double> & joint_radians, const double & gripper_meters);
+   bool set_gripper_profile_acceleration(const int32_t & acceleration);
+   bool set_gripper_profile_velocity(const int32_t & velocity);
+ 
+diff --git a/turtlebot3_manipulation_hardware/include/turtlebot3_manipulation_hardware/turtlebot3_manipulation_system.hpp b/turtlebot3_manipulation_hardware/include/turtlebot3_manipulation_hardware/turtlebot3_manipulation_system.hpp
+index af40d78..5857544 100644
+--- a/turtlebot3_manipulation_hardware/include/turtlebot3_manipulation_hardware/turtlebot3_manipulation_system.hpp
++++ b/turtlebot3_manipulation_hardware/include/turtlebot3_manipulation_hardware/turtlebot3_manipulation_system.hpp
+@@ -17,6 +17,7 @@
+ #ifndef TURTLEBOT3_MANIPULATION_HARDWARE__TURTLEBOT3_MANIPULATION_SYSTEM_HPP_
+ #define TURTLEBOT3_MANIPULATION_HARDWARE__TURTLEBOT3_MANIPULATION_SYSTEM_HPP_
+ 
++#include <chrono>
+ #include <memory>
+ #include <string>
+ #include <vector>
+@@ -93,6 +94,18 @@ private:
+   std::vector<double> dxl_velocities_;
+ 
+   std::vector<double> opencr_sensor_states_;
++
++  // OpenCR は 1 秒に 43 回しか通信できないので、変化したときと一定間隔のときだけ通信する
++  std::chrono::steady_clock::time_point last_read_time_;
++  std::chrono::steady_clock::time_point last_heartbeat_time_;
++  std::chrono::steady_clock::time_point last_wheel_write_time_;
++  std::chrono::steady_clock::time_point last_goal_write_time_;
++  bool first_read_ = true;
++  bool service_used_ = false;   // この周期で、読み取り・心拍・車輪の定期書き込みのどれかをもう通信したか（1 周期に 1 つまで）
++  bool first_write_ = true;
++  std::vector<double> sent_wheel_commands_;
++  std::vector<double> sent_joint_commands_;
++  double sent_gripper_command_ = 0.0;
+ };
+ }  // namespace turtlebot3_manipulation_hardware
+ }  // namespace robotis
+diff --git a/turtlebot3_manipulation_hardware/src/opencr.cpp b/turtlebot3_manipulation_hardware/src/opencr.cpp
+index 97608a0..fc77f91 100644
+--- a/turtlebot3_manipulation_hardware/src/opencr.cpp
++++ b/turtlebot3_manipulation_hardware/src/opencr.cpp
+@@ -18,6 +18,7 @@
+ 
+ #include <unistd.h>
+ #include <algorithm>
++#include <cstring>
+ #include <memory>
+ #include <string>
+ #include <vector>
+@@ -471,6 +472,35 @@ bool OpenCR::set_gripper_position(const double & meters)
+   return comm_result;
+ }
+ 
++bool OpenCR::set_goal_positions(
++  const std::vector<double> & joint_radians, const double & gripper_meters)
++{
++  // goal_position_joint_1..4 (200..215), goal_position_gripper (216..219),
++  // goal_position_write_joints (220), goal_position_write_gripper (221) は連続している
++  uint8_t buffer[22];
++  int32_t ticks[5] = {0, 0, 0, 0, 0};
++  for (uint8_t i = 0; i < 4 && i < joint_radians.size(); i++) {
++    ticks[i] = convert_radian_to_tick(
++      joint_radians[i],
++      opencr::joints::MAX_TICK,
++      opencr::joints::MIN_TICK,
++      opencr::joints::MAX_RADIAN,
++      opencr::joints::MIN_RADIAN);
++  }
++  ticks[4] = convert_radian_to_tick(
++    gripper_meters / opencr::grippers::RAD_TO_METER,
++    opencr::joints::MAX_TICK,
++    opencr::joints::MIN_TICK,
++    opencr::joints::MAX_RADIAN,
++    opencr::joints::MIN_RADIAN);
++  std::memcpy(buffer, ticks, sizeof(ticks));
++  buffer[20] = 1;
++  buffer[21] = 1;
++
++  return dxl_sdk_wrapper_->write(
++    opencr_control_table.goal_position_joint_1.address, sizeof(buffer), buffer);
++}
++
+ bool OpenCR::set_gripper_profile_acceleration(const int32_t & acceleration)
+ {
+   bool comm_result = set_gripper_variables(
+diff --git a/turtlebot3_manipulation_hardware/src/turtlebot3_manipulation_system.cpp b/turtlebot3_manipulation_hardware/src/turtlebot3_manipulation_system.cpp
+index 46f03dc..5950c74 100644
+--- a/turtlebot3_manipulation_hardware/src/turtlebot3_manipulation_system.cpp
++++ b/turtlebot3_manipulation_hardware/src/turtlebot3_manipulation_system.cpp
+@@ -17,6 +17,7 @@
+ #include <array>
+ #include <chrono>
+ #include <cmath>
++#include <cstdlib>
+ #include <memory>
+ #include <vector>
+ 
+@@ -30,6 +31,19 @@ namespace robotis
+ namespace turtlebot3_manipulation_hardware
+ {
+ auto logger = rclcpp::get_logger("turtlebot3_manipulation");
++
++// OpenCR は 1 回の通信に約 23 ms かかり、1 秒に 43 回しか応答できない（2026-10-26 実測）。
++// 元の実装は 1 周期に 7 回通信して約 5 Hz でしか動かなかったため、
++// 通信を (1) 読み取り 100 ms ごと (2) 心拍 200 ms ごと (3) 車輪と腕の指令は変化したときと一定間隔、に減らして腕を滑らかに動かす。
++constexpr int kReadIntervalMs = 100;
++constexpr int kHeartbeatIntervalMs = 200;
++constexpr int kWheelRefreshMs = 300;
++constexpr int kGoalRefreshMs = 400;
++// 腕の指令を書く間隔の下限。指令が変わるたびにすぐ書くと、読み取りなどと重なって間隔が 30〜115 ms にばらつき、動きがぎくしゃくする。
++// 40 ms 空けて（約 20 Hz で）一定の間隔にそろえ、そのあいだに読み取り・心拍・車輪の通信を入れる
++constexpr int kGoalMinGapMs = 40;
++constexpr int kHeartbeatMaxMs = 300;
++constexpr int kWheelRefreshMaxMs = 600;
+ hardware_interface::CallbackReturn TurtleBot3ManipulationSystemHardware::on_init(
+   const hardware_interface::HardwareInfo & info)
+ {
+@@ -45,15 +59,14 @@ hardware_interface::CallbackReturn TurtleBot3ManipulationSystemHardware::on_init
+   baud_rate_ = stoi(info_.hardware_parameters["opencr_baud_rate"]);
+   heartbeat_ = 0;
+ 
+-  joints_acceleration_[0] = stoi(info_.hardware_parameters["dxl_joints_profile_acceleration"]);
+-  joints_acceleration_[1] = stoi(info_.hardware_parameters["dxl_joints_profile_acceleration"]);
+-  joints_acceleration_[2] = stoi(info_.hardware_parameters["dxl_joints_profile_acceleration"]);
+-  joints_acceleration_[3] = stoi(info_.hardware_parameters["dxl_joints_profile_acceleration"]);
+-
+-  joints_velocity_[0] = stoi(info_.hardware_parameters["dxl_joints_profile_velocity"]);
+-  joints_velocity_[1] = stoi(info_.hardware_parameters["dxl_joints_profile_velocity"]);
+-  joints_velocity_[2] = stoi(info_.hardware_parameters["dxl_joints_profile_velocity"]);
+-  joints_velocity_[3] = stoi(info_.hardware_parameters["dxl_joints_profile_velocity"]);
++  // 環境変数で上書きできる（systemd の tb3-bringup.service で設定）。サーボの加速を緩めると、指令と指令のあいだもなめらかにつながる
++  int joints_acc = stoi(info_.hardware_parameters["dxl_joints_profile_acceleration"]);
++  int joints_vel = stoi(info_.hardware_parameters["dxl_joints_profile_velocity"]);
++  if (const char * e = std::getenv("TB3_JOINTS_PROFILE_ACCELERATION")) {joints_acc = std::atoi(e);}
++  if (const char * e = std::getenv("TB3_JOINTS_PROFILE_VELOCITY")) {joints_vel = std::atoi(e);}
++  RCLCPP_INFO(logger, "Joint profile acceleration %d, velocity %d", joints_acc, joints_vel);
++  joints_acceleration_.fill(joints_acc);
++  joints_velocity_.fill(joints_vel);
+ 
+   gripper_acceleration_ = stoi(info_.hardware_parameters["dxl_gripper_profile_acceleration"]);
+   gripper_velocity_ = stoi(info_.hardware_parameters["dxl_gripper_profile_velocity"]);
+@@ -221,8 +234,15 @@ hardware_interface::return_type TurtleBot3ManipulationSystemHardware::read(
+ {
+   RCLCPP_INFO_ONCE(logger, "Start to read wheels and manipulator states");
+ 
+-  if (opencr_->read_all() == false) {
+-    RCLCPP_WARN(logger, "Failed to read all control table");
++  const auto now = std::chrono::steady_clock::now();
++  service_used_ = false;
++  if (first_read_ || now - last_read_time_ >= std::chrono::milliseconds(kReadIntervalMs)) {
++    if (opencr_->read_all() == false) {
++      RCLCPP_WARN(logger, "Failed to read all control table");
++    }
++    last_read_time_ = now;
++    first_read_ = false;
++    service_used_ = true;
+   }
+ 
+   dxl_positions_[0] = opencr_->get_wheel_positions()[opencr::wheels::LEFT];
+@@ -274,20 +294,57 @@ hardware_interface::return_type TurtleBot3ManipulationSystemHardware::write(
+   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
+ {
+   RCLCPP_INFO_ONCE(logger, "Start to write wheels and manipulator commands");
+-  opencr_->send_heartbeat(heartbeat_++);
+-
+-  if (opencr_->set_wheel_velocities(dxl_wheel_commands_) == false) {
+-    RCLCPP_ERROR(logger, "Can't control wheels");
++  const auto now = std::chrono::steady_clock::now();
++  const auto since_ms = [&now](const std::chrono::steady_clock::time_point & t) {
++      return std::chrono::duration_cast<std::chrono::milliseconds>(now - t).count();
++    };
++  const auto differs = [](const std::vector<double> & a, const std::vector<double> & b, double eps) {
++      if (a.size() != b.size()) {return true;}
++      for (size_t i = 0; i < a.size(); i++) {
++        if (std::fabs(a[i] - b[i]) > eps) {return true;}
++      }
++      return false;
++    };
++
++  // 定期の通信（読み取り・心拍・車輪の書き直し）は 1 周期に 1 つまで。重なると腕の指令の間隔が 100 ms 近くまで開いてぎくしゃくする。
++  // 心拍だけは、遅れすぎると OpenCR が通信切れと見なすかもしれないので、300 ms を超えたら重なっても送る
++  if (first_write_ || (since_ms(last_heartbeat_time_) >= kHeartbeatIntervalMs && !service_used_) ||
++    since_ms(last_heartbeat_time_) >= kHeartbeatMaxMs)
++  {
++    opencr_->send_heartbeat(heartbeat_++);
++    last_heartbeat_time_ = now;
++    service_used_ = true;
+   }
+ 
+-  if (opencr_->set_joint_positions(dxl_joint_commands_) == false) {
+-    RCLCPP_ERROR(logger, "Can't control joints");
++  if (
++    first_write_ || differs(dxl_wheel_commands_, sent_wheel_commands_, 1e-6) ||
++    (since_ms(last_wheel_write_time_) >= kWheelRefreshMs && !service_used_) ||
++    since_ms(last_wheel_write_time_) >= kWheelRefreshMaxMs)
++  {
++    if (opencr_->set_wheel_velocities(dxl_wheel_commands_) == false) {
++      RCLCPP_ERROR(logger, "Can't control wheels");
++    }
++    sent_wheel_commands_ = dxl_wheel_commands_;
++    last_wheel_write_time_ = now;
+   }
+ 
+-  if (opencr_->set_gripper_position(dxl_gripper_commands_[0]) == false) {
+-    RCLCPP_ERROR(logger, "Can't control gripper");
++  const std::vector<double> gripper_command = {dxl_gripper_commands_[0]};
++  const std::vector<double> sent_gripper = {sent_gripper_command_};
++  const bool goal_changed =
++    differs(dxl_joint_commands_, sent_joint_commands_, 1e-5) || differs(gripper_command, sent_gripper, 1e-6);
++  if (
++    first_write_ || (goal_changed && since_ms(last_goal_write_time_) >= kGoalMinGapMs) ||
++    since_ms(last_goal_write_time_) >= kGoalRefreshMs)
++  {
++    if (opencr_->set_goal_positions(dxl_joint_commands_, dxl_gripper_commands_[0]) == false) {
++      RCLCPP_ERROR(logger, "Can't control joints");
++    }
++    sent_joint_commands_ = dxl_joint_commands_;
++    sent_gripper_command_ = dxl_gripper_commands_[0];
++    last_goal_write_time_ = now;
+   }
+ 
++  first_write_ = false;
+   return hardware_interface::return_type::OK;
+ }
+ }  // namespace turtlebot3_manipulation_hardware

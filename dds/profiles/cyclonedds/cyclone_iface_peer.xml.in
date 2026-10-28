@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  cyclone_iface_peer — CycloneDDS（rmw_cyclonedds_cpp）用。IP を 1 つ指定し、相手の IP へユニキャストで発見する。マルチキャストは切る。
+  使い方:
+    sudo apt install ros-humble-rmw-cyclonedds-cpp
+    export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    export CYCLONEDDS_URI=file://$PWD/cyclone_iface_peer.xml        # render_profile.py で書き出したもの
+    ※ 機体と PC の両方を Cyclone にそろえる。Fast DDS と Cyclone の間は通信できない。
+  注意:
+   - Fast DDS 用の XML（FASTRTPS_DEFAULT_PROFILES_FILE）は Cyclone では無視される。
+   - MaxAutoParticipantIndex の既定は小さい（9 程度）。機体のようにノードが多いと足りず、参加者が作れない／見つからない。多め（ここでは 100）にしておく（未検証）。
+   - 要素名は Humble 同梱の Cyclone（0.10 系）のもの。新しい Cyclone では General/Interfaces/NetworkInterface に変わっている。
+   - この機体では動かしていない（rmw_cyclonedds_cpp は WSL の Go2-ROS にも入っていなかった）。
+  tb3-meta: rmw=rmw_cyclonedds_cpp
+  tb3-meta: requires=IFACE_IP,ROBOT_IP
+  tb3-meta: env_uri=1
+-->
+<CycloneDDS xmlns="https://cdds.io/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
+  <Domain id="any">
+    <General>
+      <NetworkInterfaceAddress>@IFACE_IP@</NetworkInterfaceAddress>
+      <AllowMulticast>false</AllowMulticast>
+    </General>
+    <Discovery>
+      <Peers>
+        <Peer address="@ROBOT_IP@"/>
+      </Peers>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>100</MaxAutoParticipantIndex>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

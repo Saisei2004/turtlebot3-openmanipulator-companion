@@ -1,0 +1,17 @@
+[Unit]
+Description=Stop the arm and wheels when the PC heartbeat is lost (tb3-companion)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=__USER__
+EnvironmentFile=/etc/tb3/tb3.env
+Environment=FASTRTPS_DEFAULT_PROFILES_FILE=/etc/tb3/fastdds.xml
+ExecStartPre=+/usr/local/bin/tb3_render_dds.sh
+ExecStart=/bin/bash -c 'source /opt/ros/humble/setup.bash && exec python3 /usr/local/bin/tb3_deadman.py'
+TimeoutStartSec=150
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

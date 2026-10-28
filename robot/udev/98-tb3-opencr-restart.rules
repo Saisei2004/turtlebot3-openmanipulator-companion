@@ -1,0 +1,2 @@
+# OpenCR がつなぎ直されたら（電圧低下での再起動など）制御を起動し直す
+ACTION=="add", SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", RUN+="/usr/bin/systemctl --no-block restart tb3-bringup.service"

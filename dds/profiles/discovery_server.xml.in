@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  discovery_server — Discovery Server（1 か所に参加者の情報を集める方式）のクライアント。マルチキャストを使わない。
+  目的: Wi-Fi でマルチキャストに頼らない発見（実験 B）。この機体では未検証。
+  手順（サーバーは @SERVER_IP@ で動かす想定。機体でも PC でもよい）:
+    1. サーバー側で:  fastdds discovery -i @SERVER_ID@ -l @SERVER_IP@ -p @SERVER_PORT@
+       （サーバー ID が 0 のとき GUID の接頭辞は 44.53.00.5f.45.50.52.4f.53.49.4d.41。下の prefix はそこから作っている）
+    2. 機体のサービスと PC の両方が、このプロファイル（クライアント）で起動する。環境変数だけで済ませる方法もある:
+         export ROS_DISCOVERY_SERVER=@SERVER_IP@:@SERVER_PORT@     # Humble の rmw_fastrtps が解釈する
+         export ROS_SUPER_CLIENT=True                               # ros2 topic list などの CLI は、全部を見るためスーパークライアントにする
+  注意:
+   - クライアントは、自分が購読・発行するトピックに関係する相手しか知らされない。CLI で全体を見るなら discovery_super_client を使う。
+   - サーバーが落ちると、新しい参加者は互いを見つけられない（すでに見つけた相手との通信は続く）。サーバーが 1 点の弱点になる。
+   - 公式の説明に基づく書き方で、この機体では動かしていない。
+  tb3-meta: rmw=rmw_fastrtps_cpp
+  tb3-meta: requires=SERVER_IP
+  tb3-meta: env=ROS_DISCOVERY_SERVER=@SERVER_IP@:@SERVER_PORT@
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <participant profile_name="tb3_discovery_client" is_default_profile="true">
+    <rtps>
+      <builtin>
+        <discovery_config>
+          <discoveryProtocol>CLIENT</discoveryProtocol>
+          <discoveryServersList>
+            <RemoteServer prefix="@SERVER_PREFIX@">
+              <metatrafficUnicastLocatorList>
+                <locator>
+                  <udpv4>
+                    <address>@SERVER_IP@</address>
+                    <port>@SERVER_PORT@</port>
+                  </udpv4>
+                </locator>
+              </metatrafficUnicastLocatorList>
+            </RemoteServer>
+          </discoveryServersList>
+        </discovery_config>
+      </builtin>
+    </rtps>
+  </participant>
+</profiles>

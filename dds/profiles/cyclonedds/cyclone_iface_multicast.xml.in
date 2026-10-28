@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  cyclone_iface_multicast — CycloneDDS 用。使う IP だけ指定し、発見は既定（マルチキャスト）。
+  目的: Fast DDS の interface_whitelist + multicast_only に近い条件の Cyclone 版（実験 H）。
+  この機体では動かしていない。注意は cyclone_iface_peer.xml.in と同じ。
+  tb3-meta: rmw=rmw_cyclonedds_cpp
+  tb3-meta: requires=IFACE_IP
+  tb3-meta: env_uri=1
+-->
+<CycloneDDS xmlns="https://cdds.io/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
+  <Domain id="any">
+    <General>
+      <NetworkInterfaceAddress>@IFACE_IP@</NetworkInterfaceAddress>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>100</MaxAutoParticipantIndex>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

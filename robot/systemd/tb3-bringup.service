@@ -1,0 +1,22 @@
+[Unit]
+Description=TurtleBot3 manipulation bringup + LiDAR (tb3-companion)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=__USER__
+# ROS_DOMAIN_ID / TURTLEBOT3_MODEL / LDS_MODEL / DDS_IFACE / TB3_JOINTS_PROFILE_* は /etc/tb3/tb3.env（tb3ctl robot-apply が書く）
+EnvironmentFile=/etc/tb3/tb3.env
+Environment=FASTRTPS_DEFAULT_PROFILES_FILE=/etc/tb3/fastdds.xml
+# 通信に使うインタフェースが IP を取るまで待ち、そのときの IP で Fast DDS のプロファイルを作る（DHCP でも動く）。+ は root で実行
+ExecStartPre=+/usr/local/bin/tb3_render_dds.sh
+ExecStart=/bin/bash /usr/local/bin/tb3_bringup.sh
+KillSignal=SIGINT
+KillMode=control-group
+TimeoutStartSec=150
+TimeoutStopSec=15
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

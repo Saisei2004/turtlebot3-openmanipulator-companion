@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  discovery_super_client — Discovery Server のスーパークライアント。ros2 topic list など「全体を見たい」CLI・測定用。
+  使い方・注意は discovery_server.xml.in と同じ。サーバー（fastdds discovery）は別に動かしておく。
+  この機体では未検証。
+  tb3-meta: rmw=rmw_fastrtps_cpp
+  tb3-meta: requires=SERVER_IP
+  tb3-meta: env=ROS_DISCOVERY_SERVER=@SERVER_IP@:@SERVER_PORT@
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <participant profile_name="tb3_discovery_super_client" is_default_profile="true">
+    <rtps>
+      <builtin>
+        <discovery_config>
+          <discoveryProtocol>SUPER_CLIENT</discoveryProtocol>
+          <discoveryServersList>
+            <RemoteServer prefix="@SERVER_PREFIX@">
+              <metatrafficUnicastLocatorList>
+                <locator>
+                  <udpv4>
+                    <address>@SERVER_IP@</address>
+                    <port>@SERVER_PORT@</port>
+                  </udpv4>
+                </locator>
+              </metatrafficUnicastLocatorList>
+            </RemoteServer>
+          </discoveryServersList>
+        </discovery_config>
+      </builtin>
+    </rtps>
+  </participant>
+</profiles>

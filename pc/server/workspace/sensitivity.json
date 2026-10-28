@@ -1,0 +1,123 @@
+{
+ "tolerance_mm": {
+  "0.0": {
+   "area_cm2": 1722,
+   "poses": 41696
+  },
+  "1.0": {
+   "area_cm2": 1724,
+   "poses": 41777
+  },
+  "2.0": {
+   "area_cm2": 1728,
+   "poses": 41872
+  },
+  "4.0": {
+   "area_cm2": 1745,
+   "poses": 42162
+  },
+  "6.0": {
+   "area_cm2": 1760,
+   "poses": 42575
+  }
+ },
+ "gripper": {
+  "open_19mm": {
+   "area_cm2": 1728,
+   "poses": 41872
+  },
+  "closed_minus10mm": {
+   "area_cm2": 1700,
+   "poses": 41339
+  }
+ },
+ "elbow_poses": {
+  "elbow_minus1": {
+   "poses": 41872,
+   "area_cm2": 1728
+  },
+  "elbow_plus1": {
+   "poses": 0,
+   "area_cm2": 0
+  },
+  "cells_only_reachable_with_elbow_plus1": 0
+ },
+ "web_with_limits_converted_to_q": {
+  "guard_-8cm": {
+   "both": 29782,
+   "web_only": 1125,
+   "sim_only": 0,
+   "web_only_reasons": {
+    "joint_limit": 0,
+    "self_collision": 85,
+    "floor": 0,
+    "body_wheel_lidar_plate": 1040,
+    "none(=sim ok)": 0
+   }
+  },
+  "guard_-17cm": {
+   "both": 32587,
+   "web_only": 5371,
+   "sim_only": 0,
+   "web_only_reasons": {
+    "joint_limit": 0,
+    "self_collision": 145,
+    "floor": 1342,
+    "body_wheel_lidar_plate": 3884,
+    "none(=sim ok)": 0
+   }
+  }
+ },
+ "q_limits_urdf_converted": {
+  "joint2": [
+   -2.7207,
+   0.6408
+  ],
+  "joint3": [
+   -1.0125,
+   1.3123
+  ],
+  "joint4": [
+   -0.1407,
+   3.1416
+  ]
+ },
+ "torque_cross_check": {
+  "samples": 1500,
+  "payload_kg": 0.3,
+  "max_abs_diff_Nm": 0.0,
+  "median_abs_diff_Nm": 0.0
+ },
+ "torque_summary": {
+  "0g": {
+   "max_Nm": 0.853,
+   "margin_min": 0.792,
+   "frac_of_stall_max": 0.208,
+   "frac_of_stall_at_11v": 0.225
+  },
+  "100g": {
+   "max_Nm": 1.226,
+   "margin_min": 0.701,
+   "frac_of_stall_max": 0.299,
+   "frac_of_stall_at_11v": 0.323
+  },
+  "200g": {
+   "max_Nm": 1.599,
+   "margin_min": 0.61,
+   "frac_of_stall_max": 0.39,
+   "frac_of_stall_at_11v": 0.422
+  },
+  "500g": {
+   "max_Nm": 2.717,
+   "margin_min": 0.337,
+   "frac_of_stall_max": 0.663,
+   "frac_of_stall_at_11v": 0.716
+  }
+ },
+ "torque_summary_in_primary_workspace": {
+  "0g": 0.833,
+  "100g": 1.196,
+  "200g": 1.559,
+  "500g": 2.648
+ }
+}

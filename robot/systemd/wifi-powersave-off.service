@@ -1,0 +1,13 @@
+[Unit]
+Description=Disable Wi-Fi power saving on wlan0 (lower and steadier latency)
+After=sys-subsystem-net-devices-wlan0.device network.target
+Wants=sys-subsystem-net-devices-wlan0.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/bin/sleep 3
+ExecStart=/usr/sbin/iw dev wlan0 set power_save off
+
+[Install]
+WantedBy=multi-user.target

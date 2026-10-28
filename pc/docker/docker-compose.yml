@@ -1,0 +1,14 @@
+# 使い方（Linux のホスト）:  cd <リポジトリ> && cp config/tb3.env.example config/tb3.env && 編集 && docker compose -f pc/docker/docker-compose.yml up --build
+# 操作画面: http://localhost:8080/
+services:
+  tb3:
+    build:
+      context: ../..
+      dockerfile: pc/docker/Dockerfile
+    network_mode: host          # DDS のマルチキャスト・UDP を機体と直接やりとりするため
+    volumes:
+      - ../../config/tb3.env:/opt/tb3-companion/config/tb3.env:ro
+      - tb3-data:/data
+    restart: unless-stopped
+volumes:
+  tb3-data:

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  interface_whitelist — 指定した IP（@IFACE_IP@）のインタフェースだけを使う。共有メモリは使わず、同じ機体の中でも UDP で話す。
+  目的: 有線を抜き差ししても壊れないようにする。機体の標準構成（Wi-Fi の IP だけを使う）。
+  経緯: 既定のまま、走行中に有線（eth0）を切ると、機体の ros2_control_node のトピックが PC に届かなくなった（ノード自体は 73.6 Hz で出していた）。
+        起動し直すと直った。Wi-Fi の IP だけに絞ってからも、有線を切った直後は ros2_control 系が PC に届かない時間があった（最初の 12 秒で 0 件。docs/03）。原因は特定していない。
+  注意:
+   - IP が変わる（DHCP）と、このプロファイルは何にも合わず、参加者が作れない／通信できない。固定 IP にするか、起動時に現在の IP から描き直す（tb3ctl robot-apply）。
+   - useBuiltinTransports=false なので共有メモリも使わない（同じ機体のノード同士も UDP）。CPU の負荷は上がるはずだが、測っていない。
+   - PC 側で使うときは、PC の LAN 側の IP を @IFACE_IP@ にする（WSL の mirrored では Tailscale など別のインタフェースも見える。実例: eth0 が 100.x の Tailscale、eth1 が 192.168.11.9）。
+  tb3-meta: rmw=rmw_fastrtps_cpp
+  tb3-meta: requires=IFACE_IP
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>tb3_udp_whitelist</transport_id>
+      <type>UDPv4</type>
+      <interfaceWhiteList>
+        <address>@IFACE_IP@</address>
+      </interfaceWhiteList>
+    </transport_descriptor>
+  </transport_descriptors>
+  <participant profile_name="tb3_interface_whitelist" is_default_profile="true">
+    <rtps>
+      <useBuiltinTransports>false</useBuiltinTransports>
+      <userTransports>
+        <transport_id>tb3_udp_whitelist</transport_id>
+      </userTransports>
+    </rtps>
+  </participant>
+</profiles>

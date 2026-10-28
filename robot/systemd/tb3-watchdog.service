@@ -1,0 +1,11 @@
+[Unit]
+Description=Restart tb3-bringup when the motor link is lost (tb3-companion)
+After=tb3-bringup.service
+
+[Service]
+ExecStart=/bin/bash /usr/local/bin/tb3_watchdog.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  multicast_only — 発見をマルチキャストだけにする（明示）。
+  目的: Wi-Fi ではマルチキャストの発見が遅い（新しく起動したプロセスが機体を見つけるまで約 10 秒かかった）。その基準になる。
+  内容: 既定と同じ発見（SIMPLE。239.255.0.1、ポートは 7400 + 250 * domain）を明示しただけ。initialPeersList は書かない。
+  注意: AP がマルチキャストを間引く・低速で送る場合に遅くなる。ルーターの「マルチキャスト → ユニキャスト変換」「IGMP スヌーピング」の設定でも変わる。
+  tb3-meta: rmw=rmw_fastrtps_cpp
+  tb3-meta: requires=
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <participant profile_name="tb3_multicast_only" is_default_profile="true">
+    <rtps>
+      <builtin>
+        <discovery_config>
+          <discoveryProtocol>SIMPLE</discoveryProtocol>
+        </discovery_config>
+      </builtin>
+    </rtps>
+  </participant>
+</profiles>

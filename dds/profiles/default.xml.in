@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  default — 何も変えない基準。
+  目的: 他のプロファイルと比べるときの基準（Fast DDS の既定: 全インタフェースの UDP + 共有メモリ、マルチキャスト発見）。
+  使い方: これを使うのと、環境変数 FASTRTPS_DEFAULT_PROFILES_FILE を設定しないのは同じ。
+  注意: 機体の標準構成は default ではなく interface_whitelist（有線の抜き差しで壊れないように変えてある）。
+  tb3-meta: rmw=rmw_fastrtps_cpp
+  tb3-meta: requires=
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <participant profile_name="tb3_default" is_default_profile="true">
+    <rtps>
+    </rtps>
+  </participant>
+</profiles>

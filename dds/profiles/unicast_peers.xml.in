@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  unicast_peers — 相手の IP（@ROBOT_IP@）へ、発見の呼びかけを直接（ユニキャストで）送る。マルチキャストも併用。
+  目的: Wi-Fi 越しの発見を速くする。PC 側（WSL など）で使う。相手は機体。
+  実績（この機体、2026-10-26）: 新しい参加者で /scan はすぐ届いた。/joint_states などは、届き始めたあとの最大の間隔が約 2.86 s だった。
+        PC 側に何も入れないと、/joint_states などは 12 秒の窓の最後の約 2.6 秒ぶんしか届かなかった（見つけるまでに約 10 秒）。
+  注意:
+   - ポートを書かない locator は、Fast DDS が既定のポート（7400 + 250 * domain + 10 + 2 * 参加者ID）の「最初のいくつかの参加者 ID」だけを試す。
+     機体には参加者が多い（ros2_control_node・ld08_driver・robot_state_publisher など 10 個以上）ので、ID の大きい参加者が見つかりにくいのでは、という推測がある（未確認）。
+   - そこで render_profile.py は 引数 peer-pids N で、参加者 ID 0〜N-1 のポートを明示した locator を並べる（@PEER_LOCATORS@）。既定 N=12。この書き方での効果は未検証。
+   - 機体側にも PC の IP を入れたいときは、引数 robot-ip に PC の IP を渡して、機体用に描き直す（対称にする）。
+  tb3-meta: rmw=rmw_fastrtps_cpp
+  tb3-meta: requires=ROBOT_IP
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <participant profile_name="tb3_unicast_peers" is_default_profile="true">
+    <rtps>
+      <builtin>
+        <initialPeersList>
+@PEER_LOCATORS@
+        </initialPeersList>
+      </builtin>
+    </rtps>
+  </participant>
+</profiles>

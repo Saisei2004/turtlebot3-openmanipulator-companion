@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  udp_only — 共有メモリを使わず UDP だけ（インタフェースは絞らない）。
+  目的: 共有メモリのあり・なしの比較（実験 C）。interface_whitelist から「IP の絞り込み」だけを抜いたもの。
+  注意: 同じ機体の中のノード同士も UDP になる。共有メモリまわりの異常（/dev/shm の残骸、別ユーザーの参加者との不整合）の切り分けにも使える。
+  tb3-meta: rmw=rmw_fastrtps_cpp
+  tb3-meta: requires=
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>tb3_udp_all</transport_id>
+      <type>UDPv4</type>
+    </transport_descriptor>
+  </transport_descriptors>
+  <participant profile_name="tb3_udp_only" is_default_profile="true">
+    <rtps>
+      <useBuiltinTransports>false</useBuiltinTransports>
+      <userTransports>
+        <transport_id>tb3_udp_all</transport_id>
+      </userTransports>
+    </rtps>
+  </participant>
+</profiles>

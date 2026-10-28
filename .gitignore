@@ -1,0 +1,10 @@
+# 個人の設定・実行時のデータ・生成物
+config/tb3.env
+robot/robot.env
+__pycache__/
+*.pyc
+.venv/
+results/
+*.log
+# MuJoCo 解析の生の結果（再実行で作れる。大きい）
+pc/server/workspace/out/
