@@ -4,6 +4,8 @@ TurtleBot3 + OpenManipulator-X を、ブラウザから動かして DDS（ROS 2�
 
 できること: 走行、アーム・グリッパーの操作、Orbit（円走行）、Dance（全関節を動かし続ける）。PC との通信が切れると機体は止まる。
 
+![操作画面](docs/img/ui.png)
+
 ## 手順
 
 ```bash
@@ -22,6 +24,8 @@ Windows は、先に [docs/01](docs/01-quickstart-new-pc.md) の「Windows の�
 手順 1 の直結と、手順 2 の Wi-Fi 設定は、まだ実機では動かしていない（[確認状況](docs/10-handoff-checklist.md)）。
 
 困ったとき・詳しいこと: [docs/](docs/00-overview.md)（[引き継ぎ](docs/10-handoff-checklist.md)、[DDS の検証](docs/04-dds-verification-guide.md)、[安全](docs/06-safety.md)、[トラブル](docs/08-troubleshooting.md)）
+
+**わからないことは、松田に Slack で聞いてください。または、このリポジトリで [Issue](https://github.com/Saisei2004/turtlebot3-openmanipulator-companion/issues/new) を立ててください。**
 
 ## ライセンス
 
