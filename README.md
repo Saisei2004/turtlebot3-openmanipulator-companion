@@ -4,6 +4,8 @@ TurtleBot3 + OpenManipulator-X を、ブラウザから動かして DDS（ROS 2�
 
 できること: 走行、アーム・グリッパーの操作、Orbit（円走行）、Dance（全関節を動かし続ける）。PC との通信が切れると機体は止まる。
 
+![機体](docs/img/robot.jpg)
+
 ![操作画面](docs/img/ui.png)
 
 ## 手順
