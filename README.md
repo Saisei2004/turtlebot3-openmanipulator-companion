@@ -19,7 +19,7 @@ python3 tb3ctl.py init               # 機体の IP などを答える（鍵の�
 
 Windows は、先に [docs/01](docs/01-quickstart-new-pc.md) の「Windows の準備」（WSL2 とファイアウォール）を済ませる。Windows の `cmd` では `tb3ctl.cmd`、Linux では `./tb3ctl` でも同じ。
 機体が新品の SD のときだけ、手順 1 のあとに `python3 tb3ctl.py robot-install`（[docs/02](docs/02-robot-provisioning.md)）。
-手順 1 の直結と、手順 2 の Wi-Fi 設定は、まだ実機では動かしていない（下の表）。
+手順 1 の直結と、手順 2 の Wi-Fi 設定は、まだ実機では動かしていない（[確認状況](docs/10-handoff-checklist.md)）。
 
 困ったとき・詳しいこと: [docs/](docs/00-overview.md)（[引き継ぎ](docs/10-handoff-checklist.md)、[DDS の検証](docs/04-dds-verification-guide.md)、[安全](docs/06-safety.md)、[トラブル](docs/08-troubleshooting.md)）
 
