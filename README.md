@@ -29,4 +29,4 @@ Windows は、先に [docs/01](docs/01-quickstart-new-pc.md) の「Windows の�
 
 ## ライセンス
 
-このリポジトリの自分たちのコードの**ライセンスは未設定**（持ち主が決める）。第三者のもの（ROBOTIS のメッシュ・URDF・パッチの元、MuJoCo など）は [NOTICE.md](NOTICE.md)。
+このリポジトリの自分たちのコードは [MIT ライセンス](LICENSE)。第三者のもの（ROBOTIS のメッシュ・URDF・パッチの元、MuJoCo など）は [NOTICE.md](NOTICE.md)。
