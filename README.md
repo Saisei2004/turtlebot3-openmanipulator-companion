@@ -25,6 +25,18 @@ Windows は、先に [docs/01](docs/01-quickstart-new-pc.md) の「Windows の�
 
 困ったとき・詳しいこと: [docs/](docs/00-overview.md)（[引き継ぎ](docs/10-handoff-checklist.md)、[DDS の検証](docs/04-dds-verification-guide.md)、[安全](docs/06-safety.md)、[トラブル](docs/08-troubleshooting.md)）
 
+## 機体を 1 から作る（新しい SD カード）
+
+部品: Raspberry Pi 4（4 GB）、OpenCR、OpenManipulator-X、LiDAR LDS-02、Waffle サイズの 2 段の車体（詳しくは [docs/02](docs/02-robot-provisioning.md)）。
+
+1. Raspberry Pi Imager で、**Ubuntu Server 22.04.5 (64-bit)** を SD に書く。設定は、ホスト名 `turtle-destroyer`、ユーザー `ubuntu`、ssh は公開鍵のみ（公開鍵は `robot/keys/id_ed25519_turtlebot.pub` の中身）、Wi-Fi の SSID とパスフレーズ、国 `JP`。
+2. SD を挿して電源を入れ、数分待つ。上の手順の `init`（機体の IP を答える）まで済ませる。
+3. `python3 tb3ctl.py robot-install`（ROS 2 Humble と TurtleBot3 + OpenManipulator-X を入れて、ビルドして、サービスを起動する。1〜2 時間）
+4. `python3 tb3ctl.py robot-install opencr`（OpenCR にアーム付き用のファームウェアを書く。OpenCR を USB でつないでおく）
+5. `python3 tb3ctl.py status` で、サービスが `active` になっていることを確かめる。
+
+`robot-install` は、まっさらな SD から最後まで通したことはまだない（[docs/02](docs/02-robot-provisioning.md) の「未検証」）。
+
 **わからないことは、松田に Slack で聞いてください。または、このリポジトリで [Issue](https://github.com/Saisei2004/turtlebot3-openmanipulator-companion/issues/new) を立ててください。**
 
 ## ライセンス

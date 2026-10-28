@@ -25,7 +25,7 @@
 |---|---|
 | ホスト名 | `turtle-destroyer`（mDNS で `turtle-destroyer.local`。cloud-init が `avahi-daemon` を入れる） |
 | ユーザー | `ubuntu` |
-| ssh | 有効、**公開鍵のみ**（パスワードログインは無効にした）。公開鍵は引き継ぐ人のものを入れる |
+| ssh | 有効、**公開鍵のみ**（パスワードログインは無効にした）。公開鍵は、このリポジトリの `robot/keys/id_ed25519_turtlebot.pub` を入れる（`tb3ctl init` が秘密鍵を置くので、すぐ入れる） |
 | Wi-Fi | SSID とパスフレーズ、国 `JP` |
 | タイムゾーン・キーボード | `Asia/Tokyo`、`jp` |
 
