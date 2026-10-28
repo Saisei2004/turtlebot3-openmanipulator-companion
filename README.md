@@ -45,21 +45,20 @@ TurtleBot3（Waffle サイズに作り変えた 2 段の車体）+ OpenManipulat
 
 ## クイックスタート（別の PC で、無線の機体を動かす）
 
-詳しくは [docs/01-quickstart-new-pc.md](docs/01-quickstart-new-pc.md)。Windows は先に、同じ文書の「Windows の準備」（WSL2 の mirrored ネットワークとファイアウォール）を済ませる。
+```bash
+git clone https://github.com/Saisei2004/turtlebot3-openmanipulator-companion.git tb3-companion && cd tb3-companion
+bash pc/scripts/setup_pc.sh          # PC に必要なものを入れる（WSL / Ubuntu の中。1 回だけ）
+python3 tb3ctl.py init               # 機体の IP などを答える（鍵の欄は空のまま Enter。鍵は自動で置かれる）
+```
 
-| # | やること | コマンド・操作 |
-|---|---|---|
-| 1 | PC にクローンする | `git clone https://github.com/Saisei2004/turtlebot3-openmanipulator-companion.git tb3-companion` |
-| 2 | 機体に入る鍵を置く（鍵はリポジトリの `robot/keys/` に入っている） | `python3 tb3ctl.py install-key`（`init` でも自動で置く） |
-| 3 | PC に必要なものを入れて、設定を作る | `bash pc/scripts/setup_pc.sh`（WSL / Ubuntu の中）→ `python3 tb3ctl.py init` |
-| 4 | PC と機体を、イーサネットケーブルでつなぎ、機体の電源を入れる | `python3 tb3ctl.py status` |
-| 5 | 機体に Wi-Fi を設定する | `python3 tb3ctl.py robot-wifi --ssid <SSID> --psk <パスフレーズ> --set-host` |
-| 6 | ケーブルを外す | |
-| 7 | サーバーを起動して、ブラウザで開く | `python3 tb3ctl.py server --open` |
+1. 機体の電源を入れ、PC とイーサネットケーブルでつなぐ。1〜2 分待って `python3 tb3ctl.py status`（「ssh できる」と出ればよい）
+2. `python3 tb3ctl.py robot-wifi --ssid <SSID> --psk <パスフレーズ> --set-host`（PC も同じ Wi-Fi につないでおく）
+3. ケーブルを外す
+4. `python3 tb3ctl.py server --open`（ブラウザが開く）
 
-機体が新品（まっさらな Ubuntu 22.04）のときは、手順 4 のあとに `python3 tb3ctl.py robot-install`（[docs/02-robot-provisioning.md](docs/02-robot-provisioning.md)）。初めて機体を動かす前に、必ず [docs/06-safety.md](docs/06-safety.md) の手順を読む。
-
-Windows の `cmd` では `tb3ctl.cmd`、Linux では `./tb3ctl` でも同じ。手順 4（直結）と 5（Wi-Fi の設定）は、まだ実機では動かしていない（下の表）。
+Windows は、先に [docs/01](docs/01-quickstart-new-pc.md) の「Windows の準備」（WSL2 とファイアウォール）を済ませる。Windows の `cmd` では `tb3ctl.cmd`、Linux では `./tb3ctl` でも同じ。
+機体が新品の SD のときだけ、手順 1 のあとに `python3 tb3ctl.py robot-install`（[docs/02](docs/02-robot-provisioning.md)）。
+手順 1 の直結と、手順 2 の Wi-Fi 設定は、まだ実機では動かしていない（下の表）。
 
 ## 確かめたこと／未検証
 

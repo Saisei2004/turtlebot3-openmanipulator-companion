@@ -4,20 +4,11 @@
 
 ## 0. 最短の手順（別の PC で、無線の機体を動かす）
 
-| # | やること | コマンド・操作 |
-|---|---|---|
-| 1 | PC にクローンする | `git clone https://github.com/Saisei2004/turtlebot3-openmanipulator-companion.git tb3-companion` して、中に入る |
-| 2 | PC に、機体に入る鍵を置く（鍵はリポジトリに入っている） | `python3 tb3ctl.py install-key`（手順 3 の `init` でも自動で置く） |
-| 3 | PC に必要なものを入れて、設定を作る | WSL の中で `bash pc/scripts/setup_pc.sh`、そのあと `python3 tb3ctl.py init`（Windows は先に [§2](#2-windows-の準備wsl2)） |
-| 4 | PC と機体を、イーサネットケーブルでつなぐ（1 本で直結でも、同じルーターにつなぐでもよい）。機体の電源を入れて、1〜2 分待つ | `python3 tb3ctl.py status` で、機体に「ssh できる」ことを確かめる |
-| 5 | 機体に Wi-Fi を設定する（PC も、同じ Wi-Fi につないでおく） | `python3 tb3ctl.py robot-wifi --ssid <SSID> --psk <パスフレーズ> --set-host` |
-| 6 | イーサネットケーブルを外す | |
-| 7 | サーバーを起動して、ブラウザで開く | `python3 tb3ctl.py server --open` |
+[README のクイックスタート](../README.md#クイックスタート別の-pc-で無線の機体を動かす)と同じ（Windows は先に §2）。補足:
 
-- 手順 2 の「鍵」: 機体に入る鍵（秘密鍵と公開鍵の組）は、`robot/keys/` に入っている（引き継ぎの手間を減らすため、持ち主の判断で公開リポジトリに入れた。この機体にしか効かない専用鍵）。`install-key` が `~/.ssh/` に置いて、`config/tb3.env` に書く。**機体は信頼できるネットワークにだけつなぐこと**（[robot/keys/README.md](../robot/keys/README.md)）。
-- 手順 4 の「直結」: PC と機体を 1 本のケーブルでつなぐと、DHCP サーバーが無いので、どちらも 169.254.x.x（リンクローカル）の IP になり、名前（`turtle-destroyer.local`、mDNS）で ssh できる。**これは、機体に `robot/install_robot.sh files` の新しい eth0 の設定（`/etc/netplan/60-tb3-eth0.yaml`）が入っていて、そのあと再起動した場合の動き**。今の機体には、まだ入っていない（機体は前の構成のまま）。**未検証**。ルーター経由なら、DHCP の IP と、名前で届く。
-- 手順 5 の `--set-host`: 機体が Wi-Fi の IP を取って、PC から届くことを確かめたあと、`config/tb3.env` の `ROBOT_HOST` を `<機体のホスト名>.local`（固定 IP を指定したときは、その IP）に書き換える。確定できなければ、240 秒で元の Wi-Fi の設定に自動で戻る。**実機では未検証**。
-- 手順 7 より先にサーバーを起動した場合は、手順 5 のあとに、もう一度 `tb3ctl server` で起動し直す（機体の IP を、起動のときに読むため）。
+- 手順 1 の「直結」: PC と機体を 1 本のケーブルでつなぐと、DHCP サーバーが無いので、どちらも 169.254.x.x（リンクローカル）の IP になり、名前（`turtle-destroyer.local`、mDNS）で ssh できる。**これは、機体に `robot/install_robot.sh files` の新しい eth0 の設定（`/etc/netplan/60-tb3-eth0.yaml`）が入っていて、そのあと再起動した場合の動き**。今の機体には、まだ入っていない（機体は前の構成のまま）。**未検証**。ルーター経由なら、DHCP の IP と、名前で届く。
+- 手順 2 の `--set-host`: 機体が Wi-Fi の IP を取って、PC から届くことを確かめたあと、`config/tb3.env` の `ROBOT_HOST` を `<機体のホスト名>.local`（固定 IP を指定したときは、その IP）に書き換える。確定できなければ、240 秒で元の Wi-Fi の設定に自動で戻る。**実機では未検証**。
+- 手順 4 より先にサーバーを起動した場合は、手順 2 のあとに、もう一度 `tb3ctl server` で起動し直す（機体の IP を、起動のときに読むため）。
 
 ## 1. 構成を選ぶ
 
