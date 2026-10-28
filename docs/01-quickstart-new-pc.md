@@ -2,6 +2,23 @@
 
 前提: 機体は動く状態（機体側の導入済み。新品の SD から作るときは [02](02-robot-provisioning.md)）。機体の ssh に入れること（[10](10-handoff-checklist.md) の最初の項目）。
 
+## 0. 最短の手順（別の PC で、無線の機体を動かす）
+
+| # | やること | コマンド・操作 |
+|---|---|---|
+| 1 | PC にクローンする | `git clone https://github.com/Saisei2004/turtlebot3-openmanipulator-companion.git tb3-companion` して、中に入る |
+| 2 | PC に、機体に入る鍵を置く（**前の担当者から、秘密鍵のファイルを安全な方法で受け取る**） | `python3 tb3ctl.py install-key <受け取った秘密鍵のファイル>` |
+| 3 | PC に必要なものを入れて、設定を作る | WSL の中で `bash pc/scripts/setup_pc.sh`、そのあと `python3 tb3ctl.py init`（Windows は先に [§2](#2-windows-の準備wsl2)） |
+| 4 | PC と機体を、イーサネットケーブルでつなぐ（1 本で直結でも、同じルーターにつなぐでもよい）。機体の電源を入れて、1〜2 分待つ | `python3 tb3ctl.py status` で、機体に「ssh できる」ことを確かめる |
+| 5 | 機体に Wi-Fi を設定する（PC も、同じ Wi-Fi につないでおく） | `python3 tb3ctl.py robot-wifi --ssid <SSID> --psk <パスフレーズ> --set-host` |
+| 6 | イーサネットケーブルを外す | |
+| 7 | サーバーを起動して、ブラウザで開く | `python3 tb3ctl.py server --open` |
+
+- 手順 2 の「鍵」: このリポジトリには**公開鍵**（`robot/keys/id_ed25519_turtlebot.pub`）が入っているが、公開鍵だけでは機体に入れない。入るには、組になる**秘密鍵**が要る。秘密鍵はリポジトリに入れていない。前の担当者から、暗号化した USB などで受け取る。受け取れないときは、前の担当者が機体の電源を入れて、次の人の公開鍵を足す（`tb3ctl add-key`、または [10](10-handoff-checklist.md)）。
+- 手順 4 の「直結」: PC と機体を 1 本のケーブルでつなぐと、DHCP サーバーが無いので、どちらも 169.254.x.x（リンクローカル）の IP になり、名前（`turtle-destroyer.local`、mDNS）で ssh できる。**これは、機体に `robot/install_robot.sh files` の新しい eth0 の設定（`/etc/netplan/60-tb3-eth0.yaml`）が入っていて、そのあと再起動した場合の動き**。今の機体には、まだ入っていない（機体は前の構成のまま）。**未検証**。ルーター経由なら、DHCP の IP と、名前で届く。
+- 手順 5 の `--set-host`: 機体が Wi-Fi の IP を取って、PC から届くことを確かめたあと、`config/tb3.env` の `ROBOT_HOST` を `<機体のホスト名>.local`（固定 IP を指定したときは、その IP）に書き換える。確定できなければ、240 秒で元の Wi-Fi の設定に自動で戻る。**実機では未検証**。
+- 手順 7 より先にサーバーを起動した場合は、手順 5 のあとに、もう一度 `tb3ctl server` で起動し直す（機体の IP を、起動のときに読むため）。
+
 ## 1. 構成を選ぶ
 
 | 構成 | 状態 |
@@ -82,35 +99,28 @@ python3 tb3ctl.py stop
 
 ## 6. 機体を別のネットワーク（別の Wi-Fi）につなぐ
 
-機体の ssh に入れる状態（有線でつなぐか、今の Wi-Fi 上で）から、PC で次を動かす。`--static` を付けると固定 IP、付けないと DHCP。
+機体に有線（直結でも、ルーター経由でもよい）で ssh できる状態から、PC で次を動かす。PC も、機体をつなぎたい Wi-Fi につないでおく。`--static` を付けると固定 IP、付けないと DHCP。
 
 ```bash
-python3 tb3ctl.py robot-wifi --ssid <SSID> --psk <パスフレーズ> --static 192.168.0.50/24 --gateway 192.168.0.1
+python3 tb3ctl.py robot-wifi --ssid <SSID> --psk <パスフレーズ> --set-host
 ```
 
 動き（コードのとおり。**実機では動かしていない**）:
 
 1. 機体の `/etc/netplan/50-cloud-init.yaml` を書き換える（元を `/root/50-cloud-init.yaml.tb3-backup` に控える。パスフレーズは 64 桁の 16 進に変換して書き、平文は残さない）。
 2. 240 秒後に、確定の印（`/tmp/tb3_wifi_ok`）がなければ、元の設定に戻すタイマーを先に仕掛ける。
-3. `netplan apply`。機体への ssh は一度切れる。
-4. PC を新しいネットワークにつなぎ、機体が見えたら、表示されるコマンドで確定する。
-
-   ```bash
-   ssh ubuntu@<新しい IP> 'touch /tmp/tb3_wifi_ok'
-   ```
-
-5. `config/tb3.env` の `ROBOT_HOST` を新しい IP にして、機体の DDS 設定を作り直す。
-
-   ```bash
-   python3 tb3ctl.py robot-apply
-   ```
+3. `netplan apply`。有線がつながっているので、ssh は切れない。機体が Wi-Fi の IP を取るのを、最大 60 秒待つ。
+4. PC から、機体の Wi-Fi の IP の ssh（22）に届くか、約 20 秒確かめる。届かなければ、確定せずに止まる（タイマーで元に戻る）。
+5. 届けば、確定の印を置いて、機体の ROS 2 のサービスを起動し直す（DDS の設定は、起動のたびに、そのときの Wi-Fi の IP で作り直される）。
+6. `--set-host` があれば、`config/tb3.env` の `ROBOT_HOST` を、DHCP なら `<機体のホスト名>.local`、固定 IP ならその IP に書き換える。
+7. 有線のケーブルを外してよい。
 
 固定 IP と DHCP:
 
 | | 固定 IP | DHCP |
 |---|---|---|
 | 向き | PC 側の設定（`ROBOT_HOST`）を変えなくてよい | 設定が楽 |
-| 注意 | ルーターの DHCP の割り当て範囲の**外**から選ぶ。この機体の例: Buffalo のルーターは .2〜.65 を配っていて、機体が .64 / .65 をもらったので、範囲の外の .100 を選び、PC から ping（返事なし）と `arp -a`（載っていない）で使われていないことを確かめた | 機体の IP が変わると `ROBOT_HOST` が合わなくなる。名前（mDNS: `<ホスト名>.local`）で引けるかは、**WSL からは未確認** |
+| 注意 | ルーターの DHCP の割り当て範囲の**外**から選ぶ。この機体の例: Buffalo のルーターは .2〜.65 を配っていて、機体が .64 / .65 をもらったので、範囲の外の .100 を選び、PC から ping（返事なし）と `arp -a`（載っていない）で使われていないことを確かめた | 機体の IP が変わると `ROBOT_HOST` が合わなくなる。名前（mDNS: `<ホスト名>.local`）は、`tb3ctl` が Windows 側で IP に引いて WSL に渡す（`ROBOT_IP`）。WSL の中だけでは引けないことがある。**実機では未検証** |
 | 機体の DDS | どちらも、起動のたびに `tb3_render_dds.sh` が、そのときの IP で `/etc/tb3/fastdds.xml` を作る。IP が付くまで最大 90 秒待つ | 同じ |
 
 ルーターの割り当て範囲は、ルーターの設定画面で確かめる。

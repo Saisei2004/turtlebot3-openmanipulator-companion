@@ -4,7 +4,10 @@
   tb3ctl init                  設定ファイル config/tb3.env を対話で作る（機体の IP・ドメイン ID など）
   tb3ctl robot-install [フェーズ]   機体に全部入れる（まっさらな Ubuntu 22.04 から。1〜2 時間）。フェーズ: base ros ws files opencr
   tb3ctl robot-apply           機体の設定とサービスだけ入れ直して再起動する（数十秒）
-  tb3ctl robot-wifi --ssid S --psk P [--static IP/24 --gateway GW]   機体を別の Wi-Fi につなぐ（失敗したら自動で元に戻す）
+  tb3ctl install-key 秘密鍵    前の担当者から受け取った秘密鍵を ~/.ssh に置き、config に書く（機体に ssh で入れるのは、この鍵だけ）
+  tb3ctl robot-wifi --ssid S --psk P [--set-host] [--static IP/24 --gateway GW]
+                               機体を別の Wi-Fi につなぐ。有線で ssh できる状態で動かす。PC から届くことを確かめてから確定し、
+                               確定できなければ自動で元の Wi-Fi に戻る。そのあと有線を外してよい
   tb3ctl add-key 公開鍵.pub    機体に入れる ssh の公開鍵を足す（もう入れる鍵がある状態で）
   tb3ctl robot-ssh [コマンド]  機体に ssh する
   tb3ctl server [--dry]        PC 側のサーバー（操作画面 + rosbridge + ドライバ）を起動する。--dry は機体に指令を送らない試験用
@@ -161,32 +164,124 @@ def cmd_robot_ssh(a, cfg):
     sys.exit(r.returncode)
 
 
+def tcp_open(host, port, timeout=3.0):
+    import socket
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def resolve_ip(host):
+    """機体の名前（turtle-destroyer.local など）から IPv4 を引く。Windows 側の名前解決（mDNS が使える）で引いて、WSL へ渡す"""
+    import socket
+    try:
+        return socket.getaddrinfo(host, 22, socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
+    except OSError:
+        return ""
+
+
 def cmd_robot_wifi(a, cfg):
-    """Wi-Fi の設定を換える。失敗してもつながらなくなったままにならないよう、元に戻すタイマーを先に仕掛ける"""
+    """機体を別の Wi-Fi につなぐ。有線（直結でも、ルーター経由でもよい）で ssh できる状態で動かす。
+    Wi-Fi に切り替えたあと、機体が Wi-Fi の IP を取り、PC から届くことを確かめてから確定する。
+    確定できなければ、--restore-after 秒（既定 240）で、元の Wi-Fi の設定に自動で戻る。有線の ssh はそのあいだ切れない。"""
     need_host(cfg)
     if a.static and not a.gateway:
         sys.exit("--static には --gateway も要ります")
+    if not a.psk and not a.open:
+        sys.exit("--psk（パスフレーズ）か --open（パスワードなし）が要ります")
     run(ssh_cmd(cfg, "mkdir -p ~/tb3-companion/robot/bin"))
     scp = ["scp", "-o", "StrictHostKeyChecking=accept-new"] + (["-i", os.path.expanduser(cfg["ROBOT_SSH_KEY"]), "-o", "IdentitiesOnly=yes"] if cfg["ROBOT_SSH_KEY"] else [])
     run(scp + [str(ROOT / "robot" / "bin" / "tb3_set_wifi.py"), f'{cfg["ROBOT_USER"]}@{cfg["ROBOT_HOST"]}:tb3-companion/robot/bin/'])
     args = ["--ssid", a.ssid] + (["--psk", a.psk] if a.psk else ["--open"]) + (["--static", a.static, "--gateway", a.gateway] if a.static else ["--dhcp"])
     if a.dns:
         args += ["--dns", a.dns]
-    restore_s = a.restore_after
+    user, restore_s = cfg["ROBOT_USER"], a.restore_after
     remote = (f"sudo rm -f /tmp/tb3_wifi_ok; "
-              f"sudo python3 ~/tb3-companion/robot/bin/tb3_set_wifi.py {' '.join(shlex.quote(x) for x in args)} && "
-              f"sudo bash -c \"(sleep {restore_s}; [ -e /tmp/tb3_wifi_ok ] || {{ python3 /home/{cfg['ROBOT_USER']}/tb3-companion/robot/bin/tb3_set_wifi.py --restore; netplan apply; }}) >/dev/null 2>&1 &\" && "
-              f"echo 'タイマー設定: {restore_s} 秒以内に確認できなければ元の設定に戻す' && sudo netplan apply")
-    print("Wi-Fi を切り替えます。機体への ssh は一度切れます。新しいネットワークで機体が見つかったら、下のコマンドで確定します:")
-    run(ssh_cmd(cfg, remote), check=False)
-    new_host = (a.static.split("/")[0] if a.static else cfg["ROBOT_HOST"])
-    print(f"\n1) 機体が新しいネットワークで見えるか確認（PC も同じネットワークにつなぐ）\n   ssh {cfg['ROBOT_USER']}@{new_host} 'touch /tmp/tb3_wifi_ok'   ← これで確定（{restore_s} 秒以内に）\n"
-          f"2) config/tb3.env の ROBOT_HOST を {new_host} にする\n3) tb3ctl robot-apply（DDS の設定を新しい IP で作り直す）。固定 IP でなければ機体を再起動すると自動で作り直される")
+              f"sudo python3 ~/tb3-companion/robot/bin/tb3_set_wifi.py {' '.join(shlex.quote(x) for x in args)} || exit 3; "
+              f"sudo bash -c \"(sleep {restore_s}; [ -e /tmp/tb3_wifi_ok ] || {{ python3 /home/{user}/tb3-companion/robot/bin/tb3_set_wifi.py --restore; netplan apply; }}) >/dev/null 2>&1 &\"; "
+              f"sudo netplan apply >/dev/null 2>&1; "
+              f"for i in $(seq 60); do ip -4 -o addr show dev wlan0 scope global | grep -q . && break; sleep 1; done; "
+              f"echo WIFI_IP=$(ip -4 -o addr show dev wlan0 scope global | awk '{{print $4}}' | cut -d/ -f1 | head -1); "
+              f"echo ROBOT_NAME=$(hostname); iw dev wlan0 link 2>/dev/null | grep -E 'SSID|signal'")
+    print(f"Wi-Fi を『{a.ssid}』に切り替えます（最大 1 分ほど）。有線の ssh は切れません。")
+    r = run(ssh_cmd(cfg, remote), check=False, capture=True, quiet=True)
+    if DRY:
+        return
+    out = r.stdout.decode(errors="replace")
+    print(out.rstrip())
+    info = dict(ln.split("=", 1) for ln in out.splitlines() if ln.startswith(("WIFI_IP=", "ROBOT_NAME=")))
+    wifi_ip, name = info.get("WIFI_IP", ""), info.get("ROBOT_NAME", "")
+    if r.returncode != 0 or not wifi_ip:
+        sys.exit(f"機体が Wi-Fi の IP を取れませんでした（SSID・パスフレーズ・電波を確認）。{restore_s} 秒以内に元の Wi-Fi の設定へ自動で戻ります。")
+    print(f"機体の Wi-Fi の IP: {wifi_ip}。PC から届くか確かめます…")
+    ok = False
+    for _ in range(10):
+        if tcp_open(wifi_ip, 22):
+            ok = True
+            break
+        time.sleep(2)
+    if not ok:
+        sys.exit(f"PC から {wifi_ip}:22 に届きません（PC が同じ Wi-Fi・同じネットワークにつながっているか確認）。\n"
+                 f"確定していないので、{restore_s} 秒以内に元の Wi-Fi の設定へ自動で戻ります。")
+    # 確定（自動で戻すのを止める）してから、ROS 2 のサービスを、新しい IP で起動し直す（DDS のプロファイルは起動のたびに作り直される）
+    run(ssh_cmd(cfg, "touch /tmp/tb3_wifi_ok; sudo systemctl restart tb3-bringup tb3-deadman 2>/dev/null; echo restarted"), check=False)
+    host = (a.static.split("/")[0] if a.static else (f"{name}.local" if name else wifi_ip))
+    print(f"\n確定しました。機体の Wi-Fi の IP は {wifi_ip}。")
+    if a.set_host:
+        path = Path(cfg["_path"] or ROOT / "config" / "tb3.env")
+        if path.exists():
+            lines = path.read_text(encoding="utf-8").splitlines()
+            lines = [f"ROBOT_HOST={host}" if ln.startswith("ROBOT_HOST=") else ln for ln in lines]
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+            print(f"{path} の ROBOT_HOST を {host} にしました。")
+    else:
+        print(f"config/tb3.env の ROBOT_HOST を {host} に書き換えてください（--set-host を付けると自動で書き換えます）。")
+    print("有線のケーブルを外して、`tb3ctl status` で、Wi-Fi 越しにつながることを確かめてください。")
+
+
+def cmd_install_key(a, cfg):
+    """機体に入れる秘密鍵を、この PC の ~/.ssh に置いて、config の ROBOT_SSH_KEY に書く。
+    リポジトリに入っている公開鍵（robot/keys/）と、組になっているか確かめる"""
+    src = Path(a.private_key).expanduser()
+    if not src.is_file():
+        sys.exit(f"{src} がありません")
+    head = src.read_text(errors="replace")[:80]
+    if "PRIVATE KEY" not in head:
+        sys.exit(f"{src} は秘密鍵に見えません（-----BEGIN ... PRIVATE KEY----- で始まるファイルを渡してください。.pub ではありません）")
+    pub_repo = (ROOT / "robot" / "keys" / "id_ed25519_turtlebot.pub").read_text().split()[:2]
+    r = subprocess.run(["ssh-keygen", "-y", "-f", str(src)], capture_output=True)
+    if r.returncode != 0:
+        sys.exit("秘密鍵を読めませんでした（パスフレーズ付きなら、先に ssh-keygen -p で外すか、ssh-agent を使ってください）")
+    if r.stdout.decode().split()[:2] != pub_repo and not a.force:
+        sys.exit("この秘密鍵は、リポジトリの公開鍵（robot/keys/id_ed25519_turtlebot.pub）と組になっていません。別の鍵を使うなら --force")
+    dest = Path.home() / ".ssh" / "id_ed25519_turtlebot"
+    dest.parent.mkdir(mode=0o700, exist_ok=True)
+    if DRY:
+        print("DRY> copy", src, "->", dest)
+        return
+    if src.resolve() != dest.resolve():            # すでにそこにある鍵なら、コピーしない
+        dest.write_bytes(src.read_bytes().replace(b"\r\n", b"\n"))
+    if WIN:
+        subprocess.run(["icacls", str(dest), "/inheritance:r", "/grant:r", f"{os.environ.get('USERNAME', '')}:F"], capture_output=True)
+    else:
+        dest.chmod(0o600)
+    cfgp = ROOT / "config" / "tb3.env"
+    if cfgp.exists():
+        lines = [f"ROBOT_SSH_KEY={dest}" if ln.startswith("ROBOT_SSH_KEY=") else ln for ln in cfgp.read_text(encoding="utf-8").splitlines()]
+        cfgp.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+        print(f"置きました: {dest}（config/tb3.env の ROBOT_SSH_KEY に書きました）")
+    else:
+        print(f"置きました: {dest}。tb3ctl init のとき、ssh の秘密鍵のパスに、これを答えてください")
 
 
 # ---------------------------------------------------------------- PC 側
 def cmd_server(a, cfg):
     env = {"TB3_DRYRUN": "1"} if a.dry else {}
+    ip = resolve_ip(cfg["ROBOT_HOST"]) if cfg["ROBOT_HOST"] else ""
+    if ip:
+        env["ROBOT_IP"] = ip                       # WSL は mDNS（.local）を引けないことがあるので、Windows 側で引いた IP を渡す
     cmd = pc_bash(cfg, "pc/scripts/start_server.sh", env=env)
     print("PC 側のサーバーを起動します（止めるには Ctrl-C、または別の窓で tb3ctl stop）。%s" % ("試験用: 機体には指令を送りません" if a.dry else ""))
     if a.open and not DRY:
@@ -202,7 +297,8 @@ def cmd_stop(a, cfg):
 def cmd_ros(a, cfg):
     if not a.command:
         sys.exit("usage: tb3ctl ros <コマンド...>")
-    r = run(pc_bash(cfg, "pc/scripts/run_ros.sh", args=a.command), check=False)
+    ip = resolve_ip(cfg["ROBOT_HOST"]) if cfg["ROBOT_HOST"] else ""
+    r = run(pc_bash(cfg, "pc/scripts/run_ros.sh", args=a.command, env={"ROBOT_IP": ip} if ip else None), check=False)
     sys.exit(r.returncode)
 
 
@@ -223,6 +319,8 @@ def cmd_status(a, cfg):
     if not cfg["ROBOT_HOST"]:
         return
     # 機体
+    ip = resolve_ip(cfg["ROBOT_HOST"])
+    print(f"機体の宛先: {cfg['ROBOT_HOST']} -> {ip or '（名前を引けない。IP か、同じネットワークかを確認）'}   ssh(22) に{'届く' if ip and tcp_open(ip, 22) else '届かない'}")
     r = run(ssh_cmd(cfg, "echo up; uptime -p; hostname; ip -br -4 addr show wlan0 eth0 | cut -c1-60; "
                          "for s in tb3-bringup tb3-deadman tb3-watchdog wifi-powersave-off; do printf '%s: ' $s; systemctl is-active $s; done; "
                          "iw dev wlan0 link 2>/dev/null | grep -E 'SSID|signal|tx bitrate'; iw dev wlan0 get power_save 2>/dev/null; cat /etc/tb3/tb3.env 2>/dev/null | grep -v '^#'"),
@@ -281,7 +379,10 @@ def main():
     p = sub.add_parser("robot-install"); p.add_argument("phases", nargs="*", help="base ros ws files opencr all"); p.set_defaults(fn=cmd_robot_install)
     sub.add_parser("robot-apply").set_defaults(fn=cmd_robot_apply)
     p = sub.add_parser("robot-wifi"); p.add_argument("--ssid", required=True); p.add_argument("--psk"); p.add_argument("--static"); p.add_argument("--gateway")
-    p.add_argument("--dns"); p.add_argument("--restore-after", type=int, default=240, help="確定しなければ元に戻すまでの秒数"); p.set_defaults(fn=cmd_robot_wifi)
+    p.add_argument("--dns"); p.add_argument("--open", action="store_true", help="パスワードなしのネットワーク")
+    p.add_argument("--set-host", action="store_true", help="確定したら config の ROBOT_HOST を新しい宛先に書き換える")
+    p.add_argument("--restore-after", type=int, default=240, help="確定しなければ元に戻すまでの秒数"); p.set_defaults(fn=cmd_robot_wifi)
+    p = sub.add_parser("install-key"); p.add_argument("private_key", help="前の担当者から受け取った秘密鍵のファイル"); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_install_key)
     p = sub.add_parser("add-key"); p.add_argument("pubkeys", nargs="+", help="足す公開鍵のファイル（.pub）"); p.set_defaults(fn=cmd_add_key)
     p = sub.add_parser("robot-ssh"); p.add_argument("command", nargs=argparse.REMAINDER); p.set_defaults(fn=cmd_robot_ssh)
     p = sub.add_parser("server"); p.add_argument("--dry", action="store_true"); p.add_argument("--open", action="store_true", help="ブラウザで操作画面を開く"); p.set_defaults(fn=cmd_server)

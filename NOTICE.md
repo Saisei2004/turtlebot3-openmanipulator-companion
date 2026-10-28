@@ -20,4 +20,3 @@
 ## 参考にしたもの（コードは取り込んでいない）
 
 - ROBOTIS e-Manual（TurtleBot3 の SBC Setup、Humble）。Dynamixel XM430-W350 の失速トルク 4.1 N·m（12 V）もここの値。
-- この画面の見た目（赤と琥珀色、警告テープ、計器）は、前の担当者の別プロジェクト「TRUST ME」（Peace Industries 調。`D:\claude-chat\trustme\` にあった）の配色の変数・フォントの指定・社章の SVG を流用して作った。画面の中の「Peace Industries」の文字はそこから来ている。流用元は同じ持ち主のものだが、このリポジトリを公開する前に、流用してよいか持ち主に確認すること。

@@ -19,7 +19,7 @@ TurtleBot3（Waffle サイズに作り変えた 2 段の車体）+ OpenManipulat
 
 操作画面（PC 幅）:
 
-![操作画面](docs/img/desk-ux-top.png)
+![操作画面](docs/img/ui-desktop.png)
 
 ## 構成
 
@@ -45,35 +45,23 @@ TurtleBot3（Waffle サイズに作り変えた 2 段の車体）+ OpenManipulat
 
 詳しくは [docs/00-overview.md](docs/00-overview.md)。
 
-## 3 ステップのクイックスタート（別の PC で）
+## クイックスタート（別の PC で、無線の機体を動かす）
 
-```bash
-git clone https://github.com/Saisei2004/turtlebot3-openmanipulator-companion.git tb3-companion && cd tb3-companion
-```
+詳しくは [docs/01-quickstart-new-pc.md](docs/01-quickstart-new-pc.md)。Windows は先に、同じ文書の「Windows の準備」（WSL2 の mirrored ネットワークとファイアウォール）を済ませる。
 
-機体がすでに動いている（機体側の導入が済んでいる）場合。Windows は先に [docs/01-quickstart-new-pc.md](docs/01-quickstart-new-pc.md) の「Windows」（WSL2 の mirrored ネットワークとファイアウォール）を済ませる。
+| # | やること | コマンド・操作 |
+|---|---|---|
+| 1 | PC にクローンする | `git clone https://github.com/Saisei2004/turtlebot3-openmanipulator-companion.git tb3-companion` |
+| 2 | 機体に入る鍵を置く（**秘密鍵を前の担当者から受け取る**。公開鍵だけでは入れない） | `python3 tb3ctl.py install-key <秘密鍵のファイル>` |
+| 3 | PC に必要なものを入れて、設定を作る | `bash pc/scripts/setup_pc.sh`（WSL / Ubuntu の中）→ `python3 tb3ctl.py init` |
+| 4 | PC と機体を、イーサネットケーブルでつなぎ、機体の電源を入れる | `python3 tb3ctl.py status` |
+| 5 | 機体に Wi-Fi を設定する | `python3 tb3ctl.py robot-wifi --ssid <SSID> --psk <パスフレーズ> --set-host` |
+| 6 | ケーブルを外す | |
+| 7 | サーバーを起動して、ブラウザで開く | `python3 tb3ctl.py server --open` |
 
-1. PC に ROS 2 Humble・rosbridge・MuJoCo を入れる（Ubuntu 22.04 / WSL2 の Ubuntu の中で）
+機体が新品（まっさらな Ubuntu 22.04）のときは、手順 4 のあとに `python3 tb3ctl.py robot-install`（[docs/02-robot-provisioning.md](docs/02-robot-provisioning.md)）。初めて機体を動かす前に、必ず [docs/06-safety.md](docs/06-safety.md) の手順を読む。
 
-   ```bash
-   bash pc/scripts/setup_pc.sh
-   ```
-
-2. 設定ファイル `config/tb3.env` を作る（機体の IP、ROS_DOMAIN_ID など）
-
-   ```bash
-   python3 tb3ctl.py init
-   ```
-
-3. サーバーを起動して、ブラウザで `http://localhost:8080/` を開く
-
-   ```bash
-   python3 tb3ctl.py server
-   ```
-
-機体が新品（まっさらな Ubuntu 22.04）のときは、2 のあとに `python3 tb3ctl.py robot-install`（[docs/02-robot-provisioning.md](docs/02-robot-provisioning.md)）。初めて機体を動かす前に、必ず [docs/06-safety.md](docs/06-safety.md) の手順を読む。
-
-Windows の `cmd` では `tb3ctl.cmd`、Linux では `./tb3ctl` でも同じ。
+Windows の `cmd` では `tb3ctl.cmd`、Linux では `./tb3ctl` でも同じ。手順 4（直結）と 5（Wi-Fi の設定）は、まだ実機では動かしていない（下の表）。
 
 ## 確かめたこと／未検証
 
@@ -89,7 +77,7 @@ Windows の `cmd` では `tb3ctl.cmd`、Linux では `./tb3ctl` でも同じ。
 | Orbit（円走行）の実機での走行 | **未検証**（指令の値と頻度・障害物判定の計算、通信が切れたときの停止は、機体に送らない試験用の設定で確認） |
 | ゲームパッド操作 | **未検証**（PC にゲームパッドがなかった） |
 | `robot/install_robot.sh` をまっさらな SD から最後まで通す | **未検証**（同じコマンドを 1 つずつ実機で動かしただけ） |
-| `tb3ctl robot-install` / `robot-apply` / `robot-wifi` | **未検証**（`--dry-run` で組み立てるコマンドを見ただけ） |
+| `tb3ctl robot-install` / `robot-apply` / `robot-wifi` / `install-key` / `add-key`、有線の直結（リンクローカル） | **未検証**（`--dry-run` で組み立てるコマンドを見ただけ） |
 | `tb3ctl server` / `stop` / `status` / `ros`（PC 側） | WSL で動かして確認 |
 | `tests/run_tests.sh`（機体なし） | WSL で全部通る（`ALL OK`） |
 | パッチが公式 `ROBOTIS-GIT/turtlebot3_manipulation` の `814f140` に当たる | 確認（`git apply --check`） |
@@ -130,4 +118,4 @@ Windows の `cmd` では `tb3ctl.cmd`、Linux では `./tb3ctl` でも同じ。
 
 ## ライセンス
 
-このリポジトリの自分たちのコードの**ライセンスは未設定**（公開する前に、持ち主に確認が要る）。第三者のもの（ROBOTIS のメッシュ・URDF・パッチの元、MuJoCo など）は [NOTICE.md](NOTICE.md)。
+このリポジトリの自分たちのコードの**ライセンスは未設定**（持ち主が決める）。第三者のもの（ROBOTIS のメッシュ・URDF・パッチの元、MuJoCo など）は [NOTICE.md](NOTICE.md)。

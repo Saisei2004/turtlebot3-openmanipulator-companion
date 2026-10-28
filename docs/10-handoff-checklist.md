@@ -82,7 +82,6 @@ ssh -i ~/.ssh/id_ed25519_turtlebot ubuntu@192.168.11.100 'echo "<引き継ぐ人
 | **DDS の検証** | **次の本題**。検証キットは `dds/`、手順は [04](04-dds-verification-guide.md)、設定の知識は [03](03-network-and-dds.md) | |
 | 電池が減ったときの Orbit・Dance の振る舞い | 未確認 | |
 | このリポジトリのライセンス | **未設定**。持ち主が決める。公開前に [NOTICE.md](../NOTICE.md) の「要確認」を確かめる | |
-| 画面の `Peace Industries` の文字・社章（別プロジェクト TRUST ME から流用）を、公開してよいか | 持ち主に確認 | [NOTICE.md](../NOTICE.md) |
 | git の置き場所（リモート） | https://github.com/Saisei2004/turtlebot3-openmanipulator-companion （公開。2026-10-28 に作成。持ち主を組織に移すなら GitHub の Transfer ownership） | |
 
 ## F. 連絡先（空欄。引き継ぎのときに埋める）

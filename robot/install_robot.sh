@@ -100,6 +100,12 @@ EOF
   local rc="$TB3_HOME/.bashrc"
   sudo -u "$TB3_USER" sed -i '/#TURTLEBOT3$/d; /# >>> tb3-companion >>>/,/# <<< tb3-companion <<</d' "$rc"
   printf '# >>> tb3-companion >>>\n[ -r /etc/tb3/env.sh ] && . /etc/tb3/env.sh\n# <<< tb3-companion <<<\n' | sudo -u "$TB3_USER" tee -a "$rc" >/dev/null
+  # 有線（eth0）: DHCP に加えて、リンクローカル（169.254.x.x）も持たせる。PC とケーブル 1 本で直結したとき（DHCP サーバーが無いとき）も、
+  # PC（Windows は自動で 169.254.x.x を取る）と話せて、名前（ホスト名.local、avahi）で ssh できる。反映は次の再起動のとき（今の接続を切らないため）
+  printf 'network:\n  version: 2\n  ethernets:\n    eth0:\n      dhcp4: true\n      dhcp6: true\n      optional: true\n      link-local: [ ipv4, ipv6 ]\n' | $SUDO tee /etc/netplan/60-tb3-eth0.yaml >/dev/null
+  $SUDO chmod 600 /etc/netplan/60-tb3-eth0.yaml
+  $SUDO netplan generate 2>/dev/null || { echo "netplan が eth0 の link-local を受け付けないので、60-tb3-eth0.yaml を外す" >&2; $SUDO rm -f /etc/netplan/60-tb3-eth0.yaml; }
+  $SUDO apt-get install -y -qq avahi-daemon >/dev/null 2>&1 || true
   $SUDO systemctl daemon-reload
   $SUDO systemctl enable wifi-powersave-off tb3-bringup tb3-deadman tb3-watchdog
   $SUDO systemctl restart wifi-powersave-off || true
