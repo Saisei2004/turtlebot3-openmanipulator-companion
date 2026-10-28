@@ -47,6 +47,10 @@ TurtleBot3（Waffle サイズに作り変えた 2 段の車体）+ OpenManipulat
 
 ## 3 ステップのクイックスタート（別の PC で）
 
+```bash
+git clone https://github.com/Saisei2004/turtlebot3-openmanipulator-companion.git tb3-companion && cd tb3-companion
+```
+
 機体がすでに動いている（機体側の導入が済んでいる）場合。Windows は先に [docs/01-quickstart-new-pc.md](docs/01-quickstart-new-pc.md) の「Windows」（WSL2 の mirrored ネットワークとファイアウォール）を済ませる。
 
 1. PC に ROS 2 Humble・rosbridge・MuJoCo を入れる（Ubuntu 22.04 / WSL2 の Ubuntu の中で）
